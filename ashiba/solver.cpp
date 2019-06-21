@@ -1,5 +1,11 @@
 #include "bits/stdc++.h"
+
+#include "board_loader.hpp"
+
 using namespace std;
+using boardloader::Cell;
+using boardloader::load_board;
+using boardloader::print_table;
 
 const int MANIP_NUM = 3;
 const int manip_y[] = {1, 0, -1};
@@ -14,22 +20,12 @@ enum Item{
 };
 
 enum Direction{
-    Right,
-    Down,
-    Left,
-    Up,
+    Right = 0,
+    Down  = 1,
+    Left  = 2,
+    Up    = 3,
 };
 
-enum Cell
-{
-    Empty,
-    Obstacle,
-    ManipulatorExtension,
-    FastWheels,
-    Drill,
-    Mysterious,
-    Occupied,
-};
 
 void warning( string msg ){ cerr << "Warning : " << msg << endl; }
 void error  ( string msg ){ cerr << "Error   : " << msg << endl; }
@@ -73,18 +69,18 @@ public:
     
     bool do_action( Action act ){
         if( act.opcode == "W" ){ // move_up
-            if( y+1 >= H or field[y+1][x]==Obstacle ){
+            if( y+1 >= H or field[y+1][x]==boardloader::Obstacle ){
                 return false;
             }else{
                 int y_new = y;
                 for( int d=1; d<=speed_; ++d ){
                     int moved_y = y+d;
                     int moved_x = x;
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==Obstacle )break;
-                    if( field[moved_y][moved_x] == ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == Mysterious           ) items_[ X ]++;
+                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
                     
                     y_new = y+d;
                 }
@@ -94,18 +90,18 @@ public:
             }
             
         }else if( act.opcode == "S" ){ // move_down
-            if( y-1 < 0 or field[y-1][x] == Obstacle ){
+            if( y-1 < 0 or field[y-1][x] == boardloader::Obstacle ){
                 return false;
             }else{
                 int y_new = y-1;
                 for( int d=1; d<=speed_; ++d ){
                     int moved_y = y+d;
                     int moved_x = x;
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==Obstacle )break;
-                    if( field[moved_y][moved_x] == ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == Mysterious           ) items_[ X ]++;
+                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
 
                     y_new = y-d;
                 }
@@ -115,18 +111,18 @@ public:
             }
             
         }else if( act.opcode == "A" ){ // move_left
-            if( x-1<0 or field[y][x-1] == Obstacle ){
+            if( x-1<0 or field[y][x-1] == boardloader::Obstacle ){
                 return false;
             }else{
                 int x_new = x-1;
                 for( int d=1; d<=speed_; ++d ){
                     int moved_y = y+d;
                     int moved_x = x;
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==Obstacle )break;
-                    if( field[moved_y][moved_x] == ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == Mysterious           ) items_[ X ]++;
+                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
 
                     x_new = x-d;
                 }
@@ -136,18 +132,18 @@ public:
             }
             
         }else if( act.opcode == "D" ){ // move_right
-            if( x+1>=W or field[y][x+1] == Obstacle ){
+            if( x+1>=W or field[y][x+1] == boardloader::Obstacle ){
                 return false;
             }else{
                 int x_new = x+1;
                 for( int d=1; d<=speed_; ++d ){
                     int moved_y = y+d;
                     int moved_x = x;
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==Obstacle )break;
-                    if( field[moved_y][moved_x] == ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == Mysterious           ) items_[ X ]++;
+                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
 
                     x_new = x+d;
                 }
@@ -160,16 +156,7 @@ public:
             return true;
             
         }else if( act.opcode == "E" ){ // turn_clockwize
-            if( dir_ == Right){
-                dir_ = Down;
-            }else if( dir_ == Down ){
-                dir_ = Left;
-            }else if( dir_ == Left ){
-                dir_ = Up;
-            }else if( dir_ == Up ){
-                dir_ = Right;
-            }
-            
+            dir_ = static_cast<Direction>((dir_+1)%4);            
             for( int i=0; i<manipulators_.size(); ++i ){
                 manipulators_[i] = make_pair( manipulators_[i].second, -manipulators_[i].first );
             }
@@ -177,15 +164,7 @@ public:
             return true;
             
         }else if( act.opcode == "Q" ){ // turn_counterclockwize
-            if( dir_ == Right){
-                dir_ = Up;
-            }else if( dir_ == Up ){
-                dir_ = Left;
-            }else if( dir_ == Left ){
-                dir_ = Down;
-            }else if( dir_ == Down ){
-                dir_ = Right;
-            }
+            dir_ = static_cast<Direction>((dir_+3)%4);
             
             for( int i=0; i<manipulators_.size(); ++i ){
                 manipulators_[i] = make_pair( -manipulators_[i].second, manipulators_[i].first );
@@ -213,7 +192,7 @@ public:
         assert( abs(dy+dx) == 1 and (dy==0 or dx==0) );
         if( y+dy<0 or y+dy>=H or x+dx<0 or x+dx>=W )return false;
         
-        if( field[y+dy][x+dx] == Obstacle ){
+        if( field[y+dy][x+dx] == boardloader::Obstacle ){
             return false;
         }else{
             return true;
@@ -223,7 +202,7 @@ public:
     bool isThereNeedsToPaint( int dy, int dx ){
         if( y+dy<0 or y+dy>=H or x+dx<0 or x+dx>=W )return false;
         
-        if( field[y+dy][x+dx] == Occupied ){
+        if( field[y+dy][x+dx] == boardloader::Occupied ){
             return false;
         }else{
             return true;
@@ -253,7 +232,7 @@ public:
 
 
 void dfs( Worker &robot, vector<Action>& actions ){
-    robot.field[ robot.y ][ robot.x ] = Occupied;
+    robot.field[ robot.y ][ robot.x ] = boardloader::Occupied;
     
     
     int dy[] = {0, -1, 0, 1};
@@ -274,31 +253,40 @@ void dfs( Worker &robot, vector<Action>& actions ){
     }
 }
 
+/*
 vector<vector<Cell>> dummy_load( int& start_y, int& start_x ){
     vector<vector<Cell>> ret(10, vector<Cell>(10, Empty));
     start_y = 0;
     start_x = 0;
     return ret;
 }
+*/
 
+void dump_actions( ofstream& ofs, const vector<Action>& actions ){
+    for( auto elm: actions ){
+        if( elm.operand == make_pair(-1, -1) ){
+            ofs << elm.opcode;
+        }else{
+            if( elm.opcode == "B" ){
+                ofs << "B" << "(" << elm.operand.first << "," << elm.operand.second << ")";
+            }
+        }
+    }
+}
 
 int main(){
     int start_y, start_x;
-    //    vector<vector<Cell>> field = sayama_function( "example-01.desc", start_y, start_x );
-    vector<vector<Cell>> field = dummy_load( start_y, start_x );
+    string filename = "test_case/10x10empty";
+    error( "start" );
+    vector<vector<Cell>> field = load_board( filename + ".desc", start_y, start_x );
+    error( "end" );
     Worker robot( start_y, start_x, field );
     
     vector<Action> actions;
     dfs( robot, actions );
     
-    for( auto elm: actions ){
-        if( elm.operand == make_pair(-1, -1) ){
-            cout << elm.opcode;
-        }else{
-            if( elm.opcode == "B" ){
-                cout << "B" << "(" << elm.operand.first << "," << elm.operand.second << ")";
-            }
-        }
-    }
-    cout << endl;
+    ofstream sol_fs( filename + ".sol" );
+    assert( sol_fs.is_open() and not sol_fs.fail() );
+    dump_actions( sol_fs, actions );
+    sol_fs.close();
 }
