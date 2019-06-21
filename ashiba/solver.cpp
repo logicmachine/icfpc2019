@@ -291,18 +291,22 @@ void dump_actions( ofstream& ofs, const vector<Action>& actions ){
 
 int main(){
     int start_y, start_x;
-    string dirname = "./test_data/";
-    string filename = "10x10empty";
-    error("A");
-    vector<vector<Cell>> field = load_board( "/Users/ashibata/GitHub/icfpc2019/ashiba/" + filename + ".desc", start_y, start_x );
-    error("B");
-    Worker robot( start_y, start_x, field );
-    
-    vector<Action> actions;
-    dfs( robot, actions );
-    
-    ofstream sol_fs( filename + ".sol" );
-    assert( sol_fs.is_open() and not sol_fs.fail() );
-    dump_actions( sol_fs, actions );
-    sol_fs.close();
+    string dirname = "/Users/ashibata/GitHub/icfpc2019/problems/";
+
+    for( int i=101; i<=101; ++i ){
+        stringstream ss;
+        ss << "prob-" << setfill('0') << setw(3) << right << i; 
+        string filename = ss.str();
+        cout << filename <<endl;
+        vector<vector<Cell>> field = load_board( dirname + filename + ".desc", start_y, start_x );
+        Worker robot( start_y, start_x, field );
+        
+        vector<Action> actions;
+        dfs( robot, actions );
+        
+        ofstream sol_fs( filename + ".sol" );
+        assert( sol_fs.is_open() and not sol_fs.fail() );
+        dump_actions( sol_fs, actions );
+        sol_fs.close();
+    }
 }
