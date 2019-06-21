@@ -7,7 +7,7 @@ from selenium.webdriver.chrome.options import Options
 options = Options()
 options.binary_location = '/usr/bin/google-chrome'
 options.add_argument('--headless')
-options.add_argument('--window-size=1280,1024')
+options.add_argument('--window-size=1200,1600')
 
 driver = webdriver.Chrome('chromedriver', chrome_options=options)
 driver.get('https://icfpcontest2019.github.io/solution_visualiser/')
