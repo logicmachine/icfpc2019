@@ -141,6 +141,8 @@ struct Point
     {
         return !(*this == p);
     }
+
+    std::string to_string();
 };
 
 Point get_direction(const Point& from, const Point& to)
@@ -153,8 +155,15 @@ Point get_direction(const Point& from, const Point& to)
 
 std::ostream& operator<<(std::ostream& out, const Point& p)
 {
-    out << "(" << p.y << ", " << p.x << ")";
+    out << "(" << p.y << "," << p.x << ")";
     return out;
+}
+
+std::string Point::to_string()
+{
+    std::stringstream ss;
+    ss << *this;
+    return ss.str();
 }
 
 std::string read_all(const std::string& filepath)
