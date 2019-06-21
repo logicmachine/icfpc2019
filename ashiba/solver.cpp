@@ -309,10 +309,6 @@ void dfs( Worker &robot, vector<vector<bool>>& occupied ){
             occupied[ddy][ddx] = true;
             assert( robot.doAction( Action(direction[k]) ) );
             
-            //無意味にキョロキョロ
-            if( rand()%10 == 0 )robot.doAction( Action("Q") );
-            if( rand()%15 == 0 )robot.doAction( Action("E") );
-
             dfs( robot, occupied );
             
             assert( robot.doAction( Action(direction[(k+2)%4]) ) );
