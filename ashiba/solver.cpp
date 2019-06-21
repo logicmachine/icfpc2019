@@ -1,12 +1,5 @@
 #include "bits/stdc++.h"
-
 using namespace std;
-typedef long long ll;
-typedef pair<int,int> pii;
-#define rep(i,n) for(ll i=0;i<(ll)(n);i++)
-#define all(a) (a).begin(),(a).end()
-#define pb emplace_back
-#define INF (1e9+1)
 
 const int MANIP_NUM = 3;
 const int manip_y[] = {1, 0, -1};
@@ -245,7 +238,7 @@ int main(){
 
     vector<Action> actions;
     dfs( robot, actions );
-    
+
     for( auto elm: actions ){
         if( elm.operand == make_pair(-1, -1) ){
             cout << elm.opcode;
