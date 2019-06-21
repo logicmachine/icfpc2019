@@ -77,7 +77,9 @@ namespace ikeda
             size = (en.first - st.first + 1) * (en.second - st.second + 1);
         }
     };
-    Block BLOCK_ZERO(point(0, 0), point(0, 0));
+    inline ostream &operator<<(ostream &os, const Block &e) { return (os << '(' << e.small.first << ", " << e.small.second << ")->(" 
+            << e.large.first << ',' << e.large.second << "), " << e.size << ' '); }
+    Block BLOCK_ZERO(point(0, 0), point(-1, -1));
 
     Block _largest_rectangle(vector<vector<int>> &board) {
         int H = board.size(), W = board[0].size();
@@ -101,12 +103,6 @@ namespace ikeda
         using state = pair<P, P>;
         int ans = 0;
         state ans_state;
-        for (int i = 0; i < v.size(); i++) {
-            for (int j = 0; j < v[i].size(); j++) {
-                cout << v[i][j] << " ";
-            }
-            cout << endl;
-        }
         for (int i = 0; i < H; i++) {
             stack<P> st;
             st.emplace(0, 0);
@@ -132,8 +128,6 @@ namespace ikeda
                 st.pop();
             }
         }
-        //std::cout << ans_state.first.first << " " << ans_state.first.second
-        //    << " " << ans_state.second.first << " " << ans_state.second.second << std::endl;
         return Block(ans_state.first, ans_state.second);
     }
 
