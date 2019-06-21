@@ -126,5 +126,39 @@ namespace ikeda
         return ret;
     }
 
+    vector<vector<int>> get_graph(vector<Block> &blocks)
+    {
+        vector<vector<int>> graph(blocks.size(), vector<int>(blocks.size(), 0));
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int j = i+1; j < blocks.size(); j++) {
+                auto check = [&](Block &a, Block &b) {
+                    bool ret = false;
+                    ret |= (abs(a.small.first - b.small.first) == 1);
+                    ret |= (abs(a.small.first - b.small.second) == 1);
+                    ret |= (abs(a.small.first - b.large.first) == 1);
+                    ret |= (abs(a.small.first - b.large.second) == 1);
+                    ret |= (abs(a.small.second - b.small.first) == 1);
+                    ret |= (abs(a.small.second - b.small.second) == 1);
+                    ret |= (abs(a.small.second - b.large.first) == 1);
+                    ret |= (abs(a.small.second - b.large.second) == 1);
+                    ret |= (abs(a.large.first - b.small.first) == 1);
+                    ret |= (abs(a.large.first - b.small.second) == 1);
+                    ret |= (abs(a.large.first - b.large.first) == 1);
+                    ret |= (abs(a.large.first - b.large.second) == 1);
+                    ret |= (abs(a.large.second - b.small.first) == 1);
+                    ret |= (abs(a.large.second - b.small.second) == 1);
+                    ret |= (abs(a.large.second - b.large.first) == 1);
+                    ret |= (abs(a.large.second - b.large.second) == 1);
+                    return ret;
+                };
+                if (check(blocks[i], blocks[j])) {
+                    graph[i][j] = 1;
+                    graph[j][i] = 1;
+                }
+            }
+        }
+        return graph;
+    }
+
 }
 
