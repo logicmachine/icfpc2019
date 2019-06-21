@@ -59,6 +59,7 @@ public:
         H = (int)field.size();
         W = (int)field[0].size();
         
+        field[y][x] = boardloader::Occupied;
         speed_ = 1;
         
         manipulators_.push_back( make_pair( y, x ) );
@@ -76,11 +77,14 @@ public:
                 for( int d=1; d<=speed_; ++d ){
                     int moved_y = y+d;
                     int moved_x = x;
+                    
                     if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
                     if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                     if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                     if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                    
+                    field[moved_y][moved_x] = boardloader::Occupied;
                     
                     y_new = y+d;
                 }
@@ -95,13 +99,16 @@ public:
             }else{
                 int y_new = y-1;
                 for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y+d;
+                    int moved_y = y-d;
                     int moved_x = x;
+
                     if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
                     if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                     if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                     if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+
+                    field[moved_y][moved_x] = boardloader::Occupied;
 
                     y_new = y-d;
                 }
@@ -116,13 +123,16 @@ public:
             }else{
                 int x_new = x-1;
                 for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y+d;
-                    int moved_x = x;
+                    int moved_y = y;
+                    int moved_x = x-d;
+                    
                     if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
                     if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                     if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                     if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                    
+                    field[moved_y][moved_x] = boardloader::Occupied;
 
                     x_new = x-d;
                 }
@@ -137,13 +147,16 @@ public:
             }else{
                 int x_new = x+1;
                 for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y+d;
-                    int moved_x = x;
+                    int moved_y = y;
+                    int moved_x = x+d;
+                    
                     if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
                     if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                     if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                     if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                    
+                    field[moved_y][moved_x] = boardloader::Occupied;
 
                     x_new = x+d;
                 }
@@ -156,11 +169,11 @@ public:
             return true;
             
         }else if( act.opcode == "E" ){ // turn_clockwize
-            dir_ = static_cast<Direction>((dir_+1)%4);            
+            dir_ = static_cast<Direction>((dir_+1)%4);
             for( int i=0; i<manipulators_.size(); ++i ){
                 manipulators_[i] = make_pair( manipulators_[i].second, -manipulators_[i].first );
             }
-
+            
             return true;
             
         }else if( act.opcode == "Q" ){ // turn_counterclockwize
@@ -202,7 +215,9 @@ public:
     bool isThereNeedsToPaint( int dy, int dx ){
         if( y+dy<0 or y+dy>=H or x+dx<0 or x+dx>=W )return false;
         
-        if( field[y+dy][x+dx] == boardloader::Occupied ){
+        if( field[y+dy][x+dx] == boardloader::Obstacle ){
+            return false;
+        }else if( field[y+dy][x+dx] == boardloader::Occupied ){
             return false;
         }else{
             return true;
@@ -232,8 +247,7 @@ public:
 
 
 void dfs( Worker &robot, vector<Action>& actions ){
-    robot.field[ robot.y ][ robot.x ] = boardloader::Occupied;
-    
+//    cout << robot.y << " " << robot.x << endl;
     
     int dy[] = {0, -1, 0, 1};
     int dx[] = {1, 0, -1, 0};
@@ -241,12 +255,12 @@ void dfs( Worker &robot, vector<Action>& actions ){
     
     for( int k=0; k<4; ++k ){
         if( robot.isThereNeedsToPaint( dy[k], dx[k] ) ){
-            robot.do_action( Action(direction[k]) );
+            assert( robot.do_action( Action(direction[k]) ) );
             actions.push_back( Action(direction[k]) );
-            
+
             dfs( robot, actions );
             
-            robot.do_action( Action(direction[(k+2)%4]) );
+            assert( robot.do_action( Action(direction[(k+2)%4]) ) );
             actions.push_back( Action(direction[(k+2)%4]) );
             
         }
@@ -254,13 +268,13 @@ void dfs( Worker &robot, vector<Action>& actions ){
 }
 
 /*
-vector<vector<Cell>> dummy_load( int& start_y, int& start_x ){
-    vector<vector<Cell>> ret(10, vector<Cell>(10, Empty));
-    start_y = 0;
-    start_x = 0;
-    return ret;
-}
-*/
+ vector<vector<Cell>> dummy_load( int& start_y, int& start_x ){
+ vector<vector<Cell>> ret(10, vector<Cell>(10, Empty));
+ start_y = 0;
+ start_x = 0;
+ return ret;
+ }
+ */
 
 void dump_actions( ofstream& ofs, const vector<Action>& actions ){
     for( auto elm: actions ){
@@ -274,12 +288,14 @@ void dump_actions( ofstream& ofs, const vector<Action>& actions ){
     }
 }
 
+
 int main(){
     int start_y, start_x;
-    string filename = "test_case/10x10empty";
-    error( "start" );
-    vector<vector<Cell>> field = load_board( filename + ".desc", start_y, start_x );
-    error( "end" );
+    string dirname = "./test_data/";
+    string filename = "10x10empty";
+    error("A");
+    vector<vector<Cell>> field = load_board( "/Users/ashibata/GitHub/icfpc2019/ashiba/" + filename + ".desc", start_y, start_x );
+    error("B");
     Worker robot( start_y, start_x, field );
     
     vector<Action> actions;
