@@ -5,6 +5,7 @@
 using boardloader::Cell;
 using boardloader::load_board;
 using boardloader::print_table;
+using boardloader::save_ascii;
 
 using namespace std;
 
@@ -21,4 +22,7 @@ int main()
     cout << table[0][0] << endl;
 
     print_table(table, start_y, start_x);
+
+    std::string output_filepath = "result.txt";
+    save_ascii(table, start_y, start_x, output_filepath);
 }

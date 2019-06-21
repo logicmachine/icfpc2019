@@ -56,6 +56,28 @@ void print_table(Table<Cell>& table, int y, int x)
     }
 }
 
+void save_ascii(const Table<Cell>& table, const int start_y, const int start_x, const std::string& filepath)
+{
+    std::ofstream fout;
+    fout.open(filepath);
+
+    if (!fout.is_open())
+    {
+        std::cerr << "cannot open file @ board_loader::save_ascii" << std::endl;
+        return;
+    }
+
+    for (int i = table.size() - 1; i >= 0; i--)
+    {
+        for (int j = 0; j < table[i].size(); j++)
+        {
+            fout << (i == start_y && j == start_x ? 'P' : static_cast<char>(table[i][j]));
+        }
+        fout << std::endl;
+    }
+    fout.close();
+}
+
 struct Point
 {
     int y;
