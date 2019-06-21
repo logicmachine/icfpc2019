@@ -325,7 +325,7 @@ std::map<Cell, std::vector<Point>> parse_booster(const std::string str)
     return m;
 }
 
-Table<Cell> load(const std::string& filepath, int& start_y, int& start_x)
+Table<Cell> load_board(const std::string& filepath, int& start_y, int& start_x)
 {
     auto str = read_all(filepath);
     auto splitted = split(str, '#');

@@ -3,7 +3,7 @@
 #include <iostream>
 
 using boardloader::Cell;
-using boardloader::load;
+using boardloader::load_board;
 using boardloader::print_table;
 
 using namespace std;
@@ -11,7 +11,7 @@ using namespace std;
 int main()
 {
     int start_y, start_x;
-    auto table = load("/home/xyz600/program/contest/icfpc/2019/example/example-01.desc", start_y, start_x);
+    auto table = load_board("/home/xyz600/program/contest/icfpc/2019/example/example-01.desc", start_y, start_x);
 
     std::cout << "start_y = " << start_y << endl;
     std::cout << "start_x = " << start_x << endl;
