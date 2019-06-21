@@ -33,7 +33,7 @@ namespace ikeda
         addArc(g, b, a, w);
     }
 
-    typedef pair<int, int> point;
+    typedef boardloader::Point point;
     struct Block {
         point small, large, centor;
         int size, index;
@@ -42,11 +42,11 @@ namespace ikeda
         {}
         Block(const point &st, const point &en) : small(st), large(en)
         {
-            size = (en.first - st.first + 1) * (en.second - st.second + 1);
+            size = (en.x - st.x + 1) * (en.y - st.y + 1);
         }
     };
-    inline ostream &operator<<(ostream &os, const Block &e) { return (os << '(' << e.small.first << ", " << e.small.second << ")->(" 
-            << e.large.first << ',' << e.large.second << "), " << e.size << ' '); }
+    inline ostream &operator<<(ostream &os, const Block &e) { return (os << '(' << e.small.y << ", " << e.small.x << ")->(" 
+            << e.large.y << ',' << e.large.x << "), " << e.size << ' '); }
     Block BLOCK_ZERO(point(0, 0), point(-1, -1));
 
     Block _largest_rectangle(vector<vector<int>> &board) {
@@ -67,8 +67,8 @@ namespace ikeda
                 v[i + 1][j] += v[i][j];
             }
         }
+        using state = pair<point, point>;
         using P = pair<int, int>;
-        using state = pair<P, P>;
         int ans = 0;
         state ans_state;
         for (int i = 0; i < H; i++) {
@@ -81,7 +81,7 @@ namespace ikeda
                 while (st.top().first > v[i][j]) {
                     if (ans < st.top().first * (j - st.top().second)) {
                         ans = st.top().first * (j - st.top().second);
-                        ans_state = make_pair(make_pair(i - st.top().first + 1, st.top().second), make_pair(i, j-1));
+                        ans_state = make_pair(point(i - st.top().first + 1, st.top().second), point(i, j-1));
                     }
                     pos = st.top().second;
                     st.pop();
@@ -91,7 +91,7 @@ namespace ikeda
             while (st.size()) {
                 if (ans < st.top().first*(W - st.top().second)) {
                     ans = st.top().first*(W - st.top().second);
-                    ans_state = make_pair(make_pair(i - st.top().first + 1, st.top().second), make_pair(i, W-1));
+                    ans_state = make_pair(point(i - st.top().first + 1, st.top().second), point(i, W-1));
                 }
                 st.pop();
             }
@@ -101,8 +101,8 @@ namespace ikeda
 
     void fill_state(vector<vector<int>> &state, Block &b)
     {
-        for (int i = b.small.first; i <= b.large.first; i++) {
-            for (int j = b.small.second; j <= b.large.second; j++) {
+        for (int i = b.small.y; i <= b.large.y; i++) {
+            for (int j = b.small.x; j <= b.large.x; j++) {
                 state[i][j] = 0;
             }
         }
@@ -126,39 +126,67 @@ namespace ikeda
         return ret;
     }
 
-    vector<vector<int>> get_graph(vector<Block> &blocks)
+    int dxy[5] = {0, 1, 0, -1, 0};
+    int calc_distance(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
+    {
+        vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
+        cost[from.y][from.x] = 0;
+        deque<pair<int, boardloader::Point>> que;
+        que.push_back({0, from});
+        while (!que.empty()) {
+            auto pos = que.front().second;
+            auto cs = que.front().first;
+            que.pop_front();
+            if (cs != cost[pos.y][pos.x]) continue;
+            for (int i = 0; i < 4; i++) {
+                int nx = pos.y + dxy[i], ny = pos.x + dxy[i+1];
+                if (0 <= nx && nx < board.size() &&
+                        0 <= ny && ny < board[nx].size() &&
+                        board[nx][ny] != boardloader::Cell::Obstacle && 
+                        cost[nx][ny] > cs+1) {
+                    cost[nx][ny] = cs+1;
+                    que.push_back({cs+1, boardloader::Point(nx, ny)});
+                }
+            }
+        }
+        return cost[to.y][to.x];
+    }
+
+    vector<vector<int>> get_graph(vector<vector<boardloader::Cell>> &board, vector<Block> &blocks)
     {
         vector<vector<int>> graph(blocks.size(), vector<int>(blocks.size(), 0));
         for (int i = 0; i < blocks.size(); i++) {
             for (int j = i+1; j < blocks.size(); j++) {
                 auto check = [&](Block &a, Block &b) {
                     bool ret = false;
-                    ret |= (abs(a.small.first - b.small.first) == 1);
-                    ret |= (abs(a.small.first - b.small.second) == 1);
-                    ret |= (abs(a.small.first - b.large.first) == 1);
-                    ret |= (abs(a.small.first - b.large.second) == 1);
-                    ret |= (abs(a.small.second - b.small.first) == 1);
-                    ret |= (abs(a.small.second - b.small.second) == 1);
-                    ret |= (abs(a.small.second - b.large.first) == 1);
-                    ret |= (abs(a.small.second - b.large.second) == 1);
-                    ret |= (abs(a.large.first - b.small.first) == 1);
-                    ret |= (abs(a.large.first - b.small.second) == 1);
-                    ret |= (abs(a.large.first - b.large.first) == 1);
-                    ret |= (abs(a.large.first - b.large.second) == 1);
-                    ret |= (abs(a.large.second - b.small.first) == 1);
-                    ret |= (abs(a.large.second - b.small.second) == 1);
-                    ret |= (abs(a.large.second - b.large.first) == 1);
-                    ret |= (abs(a.large.second - b.large.second) == 1);
+                    ret |= (abs(a.small.y - b.small.y) == 1);
+                    ret |= (abs(a.small.y - b.small.x) == 1);
+                    ret |= (abs(a.small.y - b.large.y) == 1);
+                    ret |= (abs(a.small.y - b.large.x) == 1);
+                    ret |= (abs(a.small.x - b.small.y) == 1);
+                    ret |= (abs(a.small.x - b.small.x) == 1);
+                    ret |= (abs(a.small.x - b.large.y) == 1);
+                    ret |= (abs(a.small.x - b.large.x) == 1);
+                    ret |= (abs(a.large.y - b.small.y) == 1);
+                    ret |= (abs(a.large.y - b.small.x) == 1);
+                    ret |= (abs(a.large.y - b.large.y) == 1);
+                    ret |= (abs(a.large.y - b.large.x) == 1);
+                    ret |= (abs(a.large.x - b.small.y) == 1);
+                    ret |= (abs(a.large.x - b.small.x) == 1);
+                    ret |= (abs(a.large.x - b.large.y) == 1);
+                    ret |= (abs(a.large.x - b.large.x) == 1);
                     return ret;
                 };
                 if (check(blocks[i], blocks[j])) {
-                    graph[i][j] = 1;
-                    graph[j][i] = 1;
+                    int tmp = calc_distance(board, blocks[i].small, blocks[j].small);
+                    graph[i][j] = tmp;
+                    graph[j][i] = tmp;
                 }
             }
         }
         return graph;
     }
+
 
 }
 

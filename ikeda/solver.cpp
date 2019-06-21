@@ -9,7 +9,14 @@ int main(int argc, char *argv[])
     int x, y;
     auto board = boardloader::load_board(path, x, y);
     auto ret = ikeda::largest_rectangle(board);
-    cout << ret.size() << endl;
+    cout << "fin" << endl;
+    auto graph = ikeda::get_graph(board, ret);
+    for (int i = 0; i < graph.size(); i++) {
+        for (int j = 0; j < graph[i].size(); j++) {
+            cout << graph[i][j] << " ";
+        }
+        cout << endl;
+    }
     return 0;
 }
 
