@@ -169,6 +169,11 @@ std::vector<std::string> split(const std::string str, const char delimiter)
         begin = index;
     }
 
+    while (ret.size() < 4)
+    {
+        ret.push_back("");
+    }
+
     return ret;
 }
 
@@ -216,7 +221,7 @@ std::vector<Point> parse_maps(const std::string str, int& sindex)
     {
         ret.push_back(parse_point(str, sindex));
         // ,
-        if (str[sindex] == ';')
+        if (sindex < str.size() && str[sindex] == ';')
         {
             break;
         }
