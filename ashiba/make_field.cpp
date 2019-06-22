@@ -2,7 +2,7 @@
 #include "../ikeda/ikeda.hpp"
 using namespace std;
 
-#define br(x,y) "(" + to_string(x) + "," + to_string(y) + ")"
+#define br(y,x) "(" + to_string(x) + "," + to_string(y) + ")"
 
 struct cord{
     int y, x;
@@ -100,7 +100,7 @@ string conv_map( vector<pair<int,int>> vp ){
         if( i!=0 ){
             ret += ",";
         }
-        ret += br(vp[i].second, vp[i].first);
+        ret += br(vp[i].first, vp[i].second);
     }
     return ret;
 }
@@ -157,11 +157,8 @@ string toDesc( vector<string>& field ){
 }
 
 int main(int argc, char* argv[]){
-    /*
-     assert( argc == 2 );
-     string filename = argv[1];
-     */
-    string filename = "noname-1";
+    assert( argc == 2 );
+    string filename = argv[1];
     
     int bNum, eNum, tSize, vMin, vMax, mNum, fNum, dNum, rNum, cNum, xNum;
     set<cord> iSqs, oSqs;
