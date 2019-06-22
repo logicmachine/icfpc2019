@@ -743,6 +743,7 @@ namespace ikeda
                             cout << "yoko : " << y << " " << x << " " << i << endl;
                             ret.push_back({y+i/2, x});
                             yoko[ny][nx] = 0;
+                            by = y; bx = x;
                             y = ny; x = nx;
                             tateyoko = !tateyoko;
                             break;
@@ -810,13 +811,7 @@ namespace ikeda
         vector<vector<int>> tate(data.size(), vector<int>(data[0].size()+1, 0)), 
             yoko(data.size()+1, vector<int>(data[0].size(), 0));
         get_edge(data, tate, yoko);
-        //auto points = generate_points(tate, yoko);
         return generate_points(tate, yoko);
-        /*
-        auto points = get_points(data);
-        auto pointss = unite_points(points);
-        pointss = unique_points(pointss);
-        */
     }
 
 }
