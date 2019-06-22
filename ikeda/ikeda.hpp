@@ -9,6 +9,50 @@ namespace ikeda
     template<class T> bool chmax(T &a, const T &b) { if (a < b) { a = b; return true; } return false; }
     template<class T> bool chmin(T &a, const T &b) { if (b < a) { a = b; return true; } return false; }
 
+    vector<vector<int>> painted;
+    int init_fl = 0;
+
+    void debug_print()
+    {
+        for (int i = 0; i < painted.size(); i++) {
+            for (int j = 0; j < painted[0].size(); j++) {
+                cout << painted[i][j] << " ";
+            }
+            cout << endl;
+        }
+    }
+
+    void init_board(int h, int w)
+    {
+        painted.assign(h, vector<int>(w, 0));
+        init_fl = 1;
+    }
+
+    void paint_pos(int y, int x)
+    {
+        painted[y][x] = 1;
+        /*
+        if (init_fl && 0 <= y && y < painted.size()
+                && 0 <= x && x < painted[0].size()) painted[y][x] = 1;
+                */
+    }
+
+    int dirdist[4][3][2] {
+        {{1, 0}, {1, -1}, {1, 1},},
+        {{0, 1}, {1, 1}, {-1, 1},},
+        {{-1, 0}, {-1, -1}, {-1, 1},},
+        {{0, -1}, {1, -1}, {-1, -1},},
+    };
+    void paint_pos(boardloader::Point &p, int dir)
+    {
+        paint_pos(p.y, p.x);
+        for (int i = 0; i < 3; i++) {
+            int ny = p.y + dirdist[dir][i][0], nx = p.x + dirdist[dir][i][1];
+            if (0 <= ny && ny < painted.size() &&
+                0 <= nx && nx < painted[0].size()) paint_pos(ny, nx);
+        }
+    }
+
     using Weight = int;
     using Flow = int;
     struct Edge {
@@ -145,7 +189,7 @@ namespace ikeda
     }
 
     int dxy[5] = {0, 1, 0, -1, 0};
-    int calc_distance(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
+    int calc_distance(vector<vector<boardloader::Cell>> &board, const boardloader::Point &from, const boardloader::Point &to)
     {
         vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
         cost[from.y][from.x] = 0;
@@ -170,7 +214,7 @@ namespace ikeda
         return cost[to.y][to.x];
     }
 
-    int calc_distance(vector<string> &board, boardloader::Point &from, boardloader::Point &to)
+    int calc_distance(vector<string> &board, const boardloader::Point &from, const boardloader::Point &to)
     {
         vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
         cost[from.y][from.x] = 0;
@@ -265,8 +309,9 @@ namespace ikeda
         return graph;
     }
 
-    char cmdchar[4] = {'R', 'D', 'L', 'U'};
-    string move(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
+    //int dxy[5] = {0, 1, 0, -1, 0};
+    string cmdchar[4] = {"A", "S", "D", "W"};
+    string move(vector<vector<boardloader::Cell>> &board, const boardloader::Point &from, const boardloader::Point &to)
     {
         vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
         cost[from.y][from.x] = 0;
@@ -288,7 +333,7 @@ namespace ikeda
                 }
             }
         }
-        vector<string> cmd;
+        string cmd;
         auto p = to;
         while (p != from) {
             for (int i = 0; i < 4; i++) {
@@ -296,7 +341,7 @@ namespace ikeda
                 if (0 <= nx && nx < board.size() &&
                         0 <= ny && ny < board[nx].size() &&
                         cost[nx][ny] == cost[p.y][p.x]-1) {
-                    cmd.push_back(cmdchar(i));
+                    cmd += cmdchar[i];
                     p = boardloader::Point(nx, ny);
                     break;
                 }
@@ -306,5 +351,227 @@ namespace ikeda
         return cmd;
     }
 
+    void dir_to_right(int &dir)
+    {
+        if (dir == 2) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 1) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+    }
+
+    void dir_to_right(boardloader::Point &p, int &dir)
+    {
+        if (dir == 2) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 1) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+        paint_pos(p, dir);
+    }
+
+    void dir_to_down(int &dir)
+    {
+        if (dir == 3) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 2) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+    }
+
+    void dir_to_down(boardloader::Point &p, int &dir)
+    {
+        if (dir == 3) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 2) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+        paint_pos(p, dir);
+    }
+
+    void dir_to_up(int &dir)
+    {
+        if (dir == 1) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 0) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+    }
+
+    void dir_to_up(boardloader::Point &p, int &dir)
+    {
+        if (dir == 1) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 0) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+        paint_pos(p, dir);
+    }
+
+    void move_right(boardloader::Point &p)
+    {
+        cout << "D";
+        p.x++;
+    }
+
+    void move_right(boardloader::Point &p, int dir)
+    {
+        move_right(p);
+        paint_pos(p, dir);
+    }
+
+    void move_left(boardloader::Point &p)
+    {
+        cout << "A";
+        p.x--;
+    }
+
+    void move_left(boardloader::Point &p, int dir)
+    {
+        move_left(p);
+        paint_pos(p, dir);
+    }
+
+    void move_down(boardloader::Point &p)
+    {
+        cout << "S";
+        p.y--;
+    }
+
+    void move_down(boardloader::Point &p, int dir)
+    {
+        move_down(p);
+        paint_pos(p, dir);
+    }
+
+    void move_up(boardloader::Point &p)
+    {
+        cout << "W";
+        p.y++;
+    }
+
+    void move_up(boardloader::Point &p, int dir)
+    {
+        move_up(p);
+        paint_pos(p, dir);
+    }
+
+    void paint_string(boardloader::Point &st, int dir, const string &cmd)
+    {
+        for (int i = 0; i < cmd.size(); i++) {
+            if (cmd[i] == 'W') {
+                st.y++;
+                paint_pos(st, dir);
+            } else if (cmd[i] == 'D') {
+                st.x++;
+                paint_pos(st, dir);
+            } else if (cmd[i] == 'S') {
+                st.y--;
+                paint_pos(st, dir);
+            } else if (cmd[i] == 'A') {
+                st.x--;
+                paint_pos(st, dir);
+            }
+        }
+    }
+
+    bool filled(Block &b)
+    {
+        if (init_fl) {
+            for (int i = b.small.y; i <= b.large.y; i++) {
+                for (int j = b.small.x; j <= b.large.x; j++) {
+                    if (!painted[i][j]) return false;
+                }
+            }
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    void paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
+    {
+        if (filled(block)) {
+            //cout << "filled!" << endl;
+            return;
+        } else {
+            //cout << "block : " << block.small << " " << block.large << endl;
+        }
+        dir_to_right(p, dir);
+        bool fl = false;
+        if ((block.large.x - block.small.x + 1) > 1) move_right(p, dir);
+        for (int j = 0; j < (block.large.x - block.small.x + 1) / 6; j++) {
+            fl = true;
+            if (j) {
+                move_right(p, dir);
+                move_right(p, dir);
+                move_right(p, dir);
+            }
+            dir_to_up(p, dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
+                move_up(p, dir);
+            }
+            dir_to_right(p, dir);
+            move_right(p, dir);
+            move_right(p, dir);
+            move_right(p, dir);
+            dir_to_down(p, dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
+                move_down(p, dir);
+            }
+            dir_to_right(p, dir);
+        }
+        if ((block.large.x - block.small.x + 1) % 6 >= 4) {
+            if (fl) {
+                move_right(p, dir);
+                move_right(p, dir);
+                move_right(p, dir);
+            }
+            fl = true;
+            dir_to_up(p, dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
+                move_up(p, dir);
+            }
+            dir_to_right(p, dir);
+            for (int i = 0; i < (block.large.x - block.small.x + 1) % 3; i++) {
+                move_right(p, dir);
+            }
+            dir_to_down(p, dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
+                move_down(p, dir);
+            }
+            dir_to_right(p, dir);
+        } else if ((block.large.x - block.small.x + 1) % 6 >= 1) {
+            if (fl) {
+                for (int i = 0; i < (block.large.x - block.small.x + 1) % 3 + 1; i++) {
+                    move_right(p, dir);
+                }
+            }
+            fl = true;
+            //cout << "dir : " << dir << endl;
+            dir_to_up(p, dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
+                move_up(p, dir);
+            }
+        }
+    }
 }
 

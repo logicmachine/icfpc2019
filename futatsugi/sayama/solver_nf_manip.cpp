@@ -1,10 +1,13 @@
 #include "board_loader.hpp"
 
-//#include "../ccl.hpp"
+#include "bits/stdc++.h"
 
 #include <algorithm>
 #include <queue>
 #include <stack>
+
+//#include "../ccl.hpp"
+#include "../../ikeda/ikeda.hpp"
 
 using boardloader::Cell;
 using boardloader::load_board;
@@ -176,6 +179,9 @@ private:
     void dfs_with_restart();
 
     void move(Direction dir);
+
+    Direction get_move_direction(char a);
+    void pickup_manipulators();
 
     bool is_inside(int cy, int cx);
 
@@ -394,7 +400,7 @@ void Worker::dfs_with_restart()
             int num_manip = manipulator_list.size();
             manipulator_list.emplace_back(0, num_manip - 2);
             //action_list.emplace_back(ActionType::Attatch, Point(0, num_manip - 2));
-            action_list.emplace_back(ActionType::Attatch, Point(num_manip - 2, 0));
+            action_list.emplace_back(ActionType::Attatch, Point(num_manip - 2, 0)); /// TODO:
         }
 
         table[y][x] = Cell::Occupied;
@@ -455,8 +461,67 @@ void Worker::dfs(int cy, int cx)
     }
 }
 
+Direction Worker::get_move_direction(char a)
+{
+    switch (a) {
+        case 'W':
+            return Direction::Up;
+        case 'S':
+            return Direction::Down;
+        case 'A':
+            return Direction::Left;
+        case 'D':
+            return Direction::Right;
+        default:
+            break;
+    }
+    return Direction::None;
+}
+
+void Worker::pickup_manipulators()
+{
+    std::vector<Point> manip_pos_list;
+    for (int yy = 0; yy < table.size(); yy++) {
+        for (int xx = 0; xx < table[0].size(); xx++) {
+            if (table[yy][xx] == Cell::ManipulatorExtension) {
+                manip_pos_list.push_back(Point(yy, xx));
+            }
+        }
+    }
+    
+    ///std::cerr << manip_pos_list.size() << std::endl; ///// debug
+    
+    //int res = ikeda::calc_distance( robot.field, {order.back().first, order.back().second}, {i, j} );
+    int cur_x = x;
+    int cur_y = y;
+    std::string move_string("");
+    while (!manip_pos_list.empty()) {
+        Point shortest_pos;
+        unsigned int shortest_length = -1U;
+        for (auto pos : manip_pos_list) {
+            int res = ikeda::calc_distance(table, {cur_y, cur_x}, {pos.y, pos.x});
+            if (shortest_length > res) {
+                shortest_length = res;
+                shortest_pos = pos;
+            }
+        }
+        ///std::cerr << shortest_length << std::endl; ////// debug
+        move_string += ikeda::move(table, {cur_y, cur_x}, {shortest_pos.y, shortest_pos.x});
+        cur_y = shortest_pos.y;
+        cur_x = shortest_pos.x;
+        manip_pos_list.erase(std::remove(manip_pos_list.begin(), manip_pos_list.end(), shortest_pos), manip_pos_list.end());
+    }
+
+    for (char a : move_string) {
+        wrap();
+        move(get_move_direction(a));
+    }
+}
+
 std::vector<Action> Worker::solve()
 {
+    pickup_manipulators();
+
     dfs_with_restart();
     // dfs(y, x);
 
