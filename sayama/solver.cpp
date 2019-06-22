@@ -165,15 +165,23 @@ private:
     void rotate_counterclockwise();
 
     void wrap();
-    bool bfs();
+
+    template <typename FUNCTION>
+    bool bfs_move(FUNCTION condition);
     void dfs(int cy, int cx);
     void dfs_with_restart();
 
     void move(Direction dir);
 
+    bool is_empty(int cy, int cx);
+
     bool is_inside(int cy, int cx);
 
     int get_empty_neighrbor_cell(int cy, int cx);
+
+    int get_empty_connected_cell(int cy, int cx, int upperbound);
+
+    std::vector<Point> shortest_path(int ty, int tx);
 
     Table<Cell> table;
     int y;
@@ -182,6 +190,8 @@ private:
     int height();
     int width();
 
+    bool reset_to_small_region();
+
     std::vector<Point> manipulator_list;
 
     std::vector<Action> action_list;
@@ -189,6 +199,11 @@ private:
     std::array<int, 4> dx;
     std::array<int, 4> dy;
 };
+
+bool Worker::is_empty(int cy, int cx)
+{
+    return table[cy][cx] != Cell::Obstacle && table[cy][cx] != Cell::Occupied;
+}
 
 void Worker::move(Direction dir)
 {
@@ -264,7 +279,8 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(-1, 1);
 }
 
-bool Worker::bfs()
+template <typename FUNCTION>
+bool Worker::bfs_move(FUNCTION condition)
 {
     Table<Direction> recur(height(), std::vector<Direction>(width(), Direction::None));
     // 何でも良い
@@ -278,7 +294,7 @@ bool Worker::bfs()
         Point p = que.front();
         que.pop();
 
-        if (table[p.y][p.x] != Cell::Obstacle && table[p.y][p.x] != Cell::Occupied)
+        if (condition(p))
         {
             std::vector<Direction> move_list;
             while (p.y != y || p.x != x)
@@ -312,6 +328,36 @@ bool Worker::bfs()
     return false;
 }
 
+int Worker::get_empty_connected_cell(int cy, int cx, int upperbound)
+{
+    std::queue<Point> que;
+    que.emplace(cy, cx);
+
+    Table<bool> visited(height(), std::vector<bool>(width(), false));
+
+    int count = 0;
+
+    while (!que.empty() && count < upperbound)
+    {
+        Point p = que.front();
+        que.pop();
+
+        for (int i = 0; i < 4; i++)
+        {
+            const int ny = p.y + dy[i];
+            const int nx = p.x + dx[i];
+
+            if (is_inside(ny, nx) && is_empty(ny, nx) && !visited[ny][nx])
+            {
+                visited[ny][nx] = true;
+                que.emplace(ny, nx);
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
 int Worker::get_empty_neighrbor_cell(int cy, int cx)
 {
     int count = 0;
@@ -319,12 +365,37 @@ int Worker::get_empty_neighrbor_cell(int cy, int cx)
     {
         const int ny = cy + dy[i];
         const int nx = cx + dx[i];
-        if (is_inside(ny, nx) && table[ny][nx] != Cell::Occupied && table[ny][nx] != Cell::Obstacle)
+        if (is_inside(ny, nx) && is_empty(ny, nx))
         {
             count++;
         }
     }
     return count;
+}
+
+bool Worker::reset_to_small_region()
+{
+    for (auto rel_point : manipulator_list)
+    {
+        const int my = y + rel_point.y;
+        const int mx = x + rel_point.x;
+
+        for (int i = 0; i < 4; i++)
+        {
+            const int ny = my + dy[i];
+            const int nx = mx + dx[i];
+
+            constexpr int upperbound = 100;
+
+            if (is_inside(ny, nx) && is_empty(ny, nx) && get_empty_connected_cell(ny, nx, upperbound) < upperbound)
+            {
+                // move (y, x) -> (ny, nx)
+                bfs_move([&](Point& p) { return p.y == ny && p.x == nx; });
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 void Worker::dfs_with_restart()
@@ -336,29 +407,32 @@ void Worker::dfs_with_restart()
         table[y][x] = Cell::Occupied;
         wrap();
 
-        selected.clear();
+        if (!reset_to_small_region())
+        {
+            selected.clear();
 
-        for (int i = 0; i < 4; i++)
-        {
-            const int ny = y + dy[i];
-            const int nx = x + dx[i];
-            if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied)
+            for (int i = 0; i < 4; i++)
             {
-                const Direction dir = static_cast<Direction>(i);
-                selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
+                const int ny = y + dy[i];
+                const int nx = x + dx[i];
+                if (is_inside(ny, nx) && is_empty(ny, nx))
+                {
+                    const Direction dir = static_cast<Direction>(i);
+                    selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
+                }
             }
-        }
-        if (selected.empty())
-        {
-            if (!bfs())
+            if (selected.empty())
             {
-                break;
+                if (!bfs_move([&](Point& p) { return is_empty(p.y, p.x); }))
+                {
+                    break;
+                }
             }
-        }
-        else
-        {
-            sort(selected.begin(), selected.end());
-            move(selected[0].second);
+            else
+            {
+                sort(selected.begin(), selected.end());
+                move(selected[0].second);
+            }
         }
     }
 }
@@ -371,7 +445,7 @@ void Worker::dfs(int cy, int cx)
     {
         const int ny = cy + dy[i];
         const int nx = cx + dx[i];
-        if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied)
+        if (is_inside(ny, nx) && is_empty(ny, nx))
         {
             const Direction dir = static_cast<Direction>(i);
             move(dir);
