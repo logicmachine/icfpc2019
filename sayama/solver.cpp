@@ -67,9 +67,16 @@ public:
     // start は 0番目とする
     static std::vector<int> solve(const Table<int>& distance)
     {
+        if (distance.size() == 1)
+        {
+            std::vector<int> ret = { 0 };
+            return ret;
+        }
+
         constexpr int INF = std::numeric_limits<int>::max() / 100;
 
         const int dim = distance.size();
+
         Table<int> rec(dim, std::vector<int>(1 << dim, INF));
         Table<int> dp(dim, std::vector<int>(1 << dim, INF));
 
@@ -308,6 +315,8 @@ public:
 
     void clone_command();
 
+    void attach_command();
+
 private:
     void rotate_clockwise();
     void rotate_counterclockwise();
@@ -385,7 +394,7 @@ void Worker::collect_optimal(std::vector<Point>& target_list)
 
         if (table[target.y][target.x] == Cell::ManipulatorExtension)
         {
-            // do something
+            attach_command();
         }
     }
 }
@@ -410,9 +419,9 @@ void Worker::init(Table<Cell>& table, int y, int x)
     dx = { 0, -1, 0, 1 };
 
     manipulator_list.emplace_back(0, 0);
-    manipulator_list.emplace_back(0, 1);
     manipulator_list.emplace_back(1, 1);
     manipulator_list.emplace_back(-1, 1);
+    manipulator_list.emplace_back(0, 1);
 }
 
 std::vector<Action>& Worker::get_action_list()
@@ -467,9 +476,9 @@ void Worker::copy_from(const Worker& src)
     y = src.y;
     x = src.x;
 
-    for (auto v : src.manipulator_list)
+    for (int i = 0; i < 4; i++)
     {
-        manipulator_list.push_back(v);
+        manipulator_list.push_back(src.manipulator_list[i]);
     }
 
     // action list doesn't have to share
@@ -496,6 +505,16 @@ Worker::Worker()
 bool Worker::is_empty(int cy, int cx)
 {
     return table[cy][cx] != Cell::Obstacle && table[cy][cx] != Cell::Occupied;
+}
+
+void Worker::attach_command()
+{
+    auto p = manipulator_list.back();
+    Point zero(0, 0);
+    auto dir = boardloader::get_direction(zero, p);
+    p += dir;
+    manipulator_list.push_back(p);
+    action_list.emplace_back(ActionType::Attatch, p);
 }
 
 void Worker::clone_command()
@@ -530,13 +549,22 @@ int Worker::width() const
 void Worker::wrap()
 {
     // TODO: 当たり判定を入れる
-    for (const auto& v : manipulator_list)
+    for (int i = 0; i < manipulator_list.size(); i++)
     {
+        auto& v = manipulator_list[i];
         const int ny = y + v.y;
         const int nx = x + v.x;
-        if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle)
+
+        if (is_inside(ny, nx))
         {
-            table[ny][nx] = Cell::Occupied;
+            if (i >= 3 && table[ny][nx] == Cell::Obstacle)
+            {
+                break;
+            }
+            else if (table[ny][nx] != Cell::Obstacle)
+            {
+                table[ny][nx] = Cell::Occupied;
+            }
         }
     }
 }
@@ -842,44 +870,56 @@ std::vector<std::vector<Action>> Solver::solve()
         target_list.push_back(p);
     }
 
-    int nearest_index = worker_list[0].select_shortest(target_list);
-    int opponent = nearest_index == 0 ? 1 : 0;
-    std::swap(target_list[nearest_index], target_list[opponent]);
+    int worker_size = 1;
 
-    worker_list[0].collect_optimal(target_list);
-
-    // Clone
-
-    std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
-
-    const int num_clone = std::max(0, std::min<int>(clone_point.size(), mysterious_point.size() - 1));
-
-    clone_point.resize(num_clone);
-    mysterious_point.resize(num_clone + 1);
-
-    // Clustering の結果を収集
-
-    Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), mysterious_point);
-
-    const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
-    worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
-
-    for (int i = 1; i <= num_clone; i++)
+    if (target_list.size() == 0)
     {
-        worker_list[i].copy_from(worker_list[0]);
-        worker_list[0].clone_command();
+        worker_list[0].dfs_with_restart();
+    }
+    else
+    {
+        int nearest_index = worker_list[0].select_shortest(target_list);
+        if (1 < target_list.size())
+        {
+            int opponent = nearest_index == 0 ? 1 : 0;
+            std::swap(target_list[nearest_index], target_list[opponent]);
+        }
+        worker_list[0].collect_optimal(target_list);
 
-        worker_list[i].bfs_move([&](Point& p) { return p == mysterious_point[i]; });
-        fill_obstacle(clustering_result, worker_list[i].get_table(), i);
-        worker_list[i].dfs_with_restart();
+        // Clone
+
+        std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
+
+        const int num_clone = std::max(0, std::min<int>(clone_point.size(), mysterious_point.size() - 1));
+
+        clone_point.resize(num_clone);
+        mysterious_point.resize(num_clone + 1);
+
+        // Clustering の結果を収集
+
+        Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), mysterious_point);
+
+        const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
+        worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
+
+        for (int i = 1; i <= num_clone; i++)
+        {
+            worker_list[i].copy_from(worker_list[0]);
+            worker_list[0].clone_command();
+
+            worker_list[i].bfs_move([&](Point& p) { return p == mysterious_point[i]; });
+            fill_obstacle(clustering_result, worker_list[i].get_table(), i);
+            worker_list[i].dfs_with_restart();
+        }
+
+        worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[0]; });
+        fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
+        worker_list[0].dfs_with_restart();
+        worker_size = num_clone + 1;
     }
 
-    worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[0]; });
-    fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
-    worker_list[0].dfs_with_restart();
-
     std::vector<std::vector<Action>> ret;
-    for (int i = 0; i <= num_clone; i++)
+    for (int i = 0; i < worker_size; i++)
     {
         ret.push_back(worker_list[i].get_action_list());
     }
