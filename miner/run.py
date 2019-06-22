@@ -20,11 +20,13 @@ def main():
     solution_root = os.path.dirname(yaml_file)
 
     client_root = '/home/ubuntu/lambda-client'
+    # client_root = '../lambda-client'
     current_block = get_current_block(client_root)
     block_root = os.path.join(client_root, 'blocks', str(current_block))
     task_file = os.path.abspath(os.path.join(block_root, 'task.desc'))
     with open(task_file, 'r') as f:
         task_text = f.read()
+    puzzle_file = os.path.abspath(os.path.join(block_root, 'puzzle.cond'))
 
     best_score = (1 << 30)
     best_solution = ''
@@ -52,6 +54,16 @@ def main():
         sys.exit(-1)
     with open('task.sol', 'w') as f:
         f.write(best_solution)
+
+    # cwd = os.path.join(solution_root, 'puzzle')
+    # proc = subprocess.Popen(['./run.sh', puzzle_file], cwd=cwd, stdout=subprocess.PIPE)
+    # outs, errs = proc.communicate()
+    # solution = outs.decode('utf-8')
+    # with open('puzzle.desc', 'w') as f:
+    #     f.write(solution)
+
+    with open('block_id', 'w') as f:
+        f.write(str(current_block))
 
 
 if __name__ == '__main__':
