@@ -573,5 +573,172 @@ namespace ikeda
             }
         }
     }
+
+    void get_edge(vector<string> &data, vector<vector<int>> &tate, vector<vector<int>> &yoko)
+    {
+        for (int i = 0; i < data.size(); i++) {
+            for (int j = 0; j < data[i].size()+1; j++) {
+                int lp = 0, rp = 0;
+                if (!j || data[i][j-1] == '#') lp = 1;
+                if (j == data[0].size() || data[i][j] == '#') rp = 1;
+                if (lp != rp) tate[i][j] = 1;
+            }
+        }
+        for (int i = 0; i < data.size()+1; i++) {
+            for (int j = 0; j < data[0].size(); j++) {
+                int lp = 0, rp = 0;
+                if (!i || data[i-1][j] == '#') lp = 1;
+                if (i == data.size() || data[i][j] == '#') rp = 1;
+                if (lp != rp) yoko[i][j] = 1;
+            }
+        }
+    }
+
+    int yokoy[4] = {0, 0, 1, 1}, yokox[4] = {0, -1, 0, -1},
+        tatey[4] = {-1, 0, -1, 0}, tatex[4] = {0, 0, 1, 1};
+    vector<pair<int, int>> generate_point(vector<vector<int>> &tate, vector<vector<int>> &yoko, int y, int x)
+    {
+        vector<pair<int, int>> ret;
+        int sty = y, stx = x, by = -5, bx = -5;
+        bool tateyoko = true;
+        do {
+            if (tateyoko) {
+                if (by != y+1 && 0 <= y+1 && y+1 < tate.size() && tate[y+1][x]) {
+                    tate[y+1][x] = 0;
+                    by = y;
+                    y++;
+                } else if (by != y-1 && 0 <= y-1 && y-1 < tate.size() && tate[y-1][x]) {
+                    tate[y-1][x] = 0;
+                    by = y;
+                    y--;
+                } else {
+                    for (int i = 0; i < 4; i++) {
+                        int ny = y + yokoy[i], nx = x + yokox[i];
+                        if (by == ny && bx == nx) continue;
+                        if (0 <= ny && ny < yoko.size() && 
+                                0 <= nx && nx < yoko[0].size() &&
+                                yoko[ny][nx]) {
+                            ret.push_back({y+i/2, x});
+                            yoko[ny][nx] = 0;
+                            by = y; bx = x;
+                            y = ny; x = nx;
+                            tateyoko = !tateyoko;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if (bx != x+1 && 0 <= x+1 && x+1 < yoko.size() && yoko[y][x+1]) {
+                    yoko[y][x+1] = 0;
+                    bx = x;
+                    x++;
+                } else if (bx != x-1 && 0 <= x-1 && x-1 < yoko.size() && yoko[y][x-1]) {
+                    yoko[y][x-1] = 0;
+                    bx = x;
+                    x--;
+                } else {
+                    for (int i = 0; i < 4; i++) {
+                        int ny = y + tatey[i], nx = x + tatex[i];
+                        if (by == ny && bx == nx) continue;
+                        if (0 <= ny && ny < tate.size() && 
+                                0 <= nx && nx < tate[0].size() &&
+                                tate[ny][nx]) {
+                            ret.push_back({y, x+i/2});
+                            tate[ny][nx] = 0;
+                            by = y; bx = x;
+                            y = ny; x = nx;
+                            tateyoko = !tateyoko;
+                            break;
+                        }
+                    }
+                }
+            }
+        } while (sty != y || stx != x || !tateyoko);
+        tate[sty][stx] = 0;
+        return ret;
+    }
+
+    inline double cross(const pair<int, int> &a, const pair<int, int> &b){
+        return a.first * b.second - a.second * b.first;
+    }
+
+    bool is_clockwize(vector<pair<int, int>> &data)
+    {
+		double s = 0.0;
+		for(int i = 0; i < data.size(); ++i){
+			s += cross(data[i], data[(i + 1) % data.size()]);
+		}
+		return s <= 0.0;
+    }
+
+    vector<vector<pair<int, int>>> generate_points(vector<vector<int>> &tate, vector<vector<int>> &yoko)
+    {
+        vector<vector<pair<int, int>>> ret;
+        for (int i = 0; i < tate.size(); i++) {
+            for (int j = 0; j < tate[i].size(); j++) {
+                if (tate[i][j]) {
+                    auto tmp = generate_point(tate, yoko, i, j);
+                    if (!is_clockwize(tmp)) {
+                        reverse(tmp.begin(), tmp.end());
+                    }
+                    ret.push_back(tmp);
+                }
+            }
+        }
+        return ret;
+    }
+
+    vector<vector<pair<int, int>>> get_tenretsu(vector<string> &data)
+    {
+        vector<vector<int>> tate(data.size(), vector<int>(data[0].size()+1, 0)), 
+            yoko(data.size()+1, vector<int>(data[0].size(), 0));
+        get_edge(data, tate, yoko);
+        return generate_points(tate, yoko);
+    }
+
+    void connect(vector<string> &board, set<pair<int, int>> ng, pair<int, int> pos)
+    {
+        vector<vector<int>> len(board.size(), vector<int>(board[0].size(), 1010001000));
+        for (int i = 0; i < board.size(); i++) {
+            for (int j = 0; j < board[0].size(); j++) {
+                if (ng.find({i, j}) != ng.end()) len[i][j] = -1;
+            }
+        }
+        deque<pair<int, pair<int, int>>> q;
+        len[pos.first][pos.second] = 0;
+        q.push_front({0, pos});
+        int finx = -100, finy = -100;
+        while (!q.empty()) {
+            auto pp = q.front(); q.pop_front();
+            if (pp.first != len[pp.second.first][pp.second.second]) continue;
+            for (int i = 0; i < 4; i++) {
+                int ny = pp.second.first + dxy[i], nx = pp.second.second + dxy[i+1];
+                if (0 <= ny && ny < board.size() && 
+                        0 <= nx && nx < board[0].size() && 
+                        len[ny][nx] != -1 && 
+                        len[ny][nx] > len[pp.second.first][pp.second.second] + 1) {
+                    len[ny][nx] = len[pp.second.first][pp.second.second] + 1;
+                    q.push_back({len[ny][nx], {ny, nx}});
+                    if (board[ny][nx] == '#' && 
+                            (finx == -100 || len[finy][finx] > len[ny][nx])) {
+                        finy = ny; finx = nx;
+                    }
+                }
+            }
+        }
+        while (finy != pos.first || finx != pos.second) {
+            board[finy][finx] = '#';
+            for (int i = 0; i < 4; i++) {
+                int ny = finy + dxy[i], nx = finx + dxy[i+1];
+                if (0 <= ny && ny < board.size() && 
+                        0 <= nx && nx < board[0].size() && 
+                        len[ny][nx] == len[finy][finx]-1) {
+                    finy = ny; finx = nx;
+                    break;
+                }
+            }
+        }
+        board[pos.first][pos.second] = '#';
+    }
 }
 
