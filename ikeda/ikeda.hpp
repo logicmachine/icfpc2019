@@ -298,7 +298,7 @@ namespace ikeda
 
     //int dxy[5] = {0, 1, 0, -1, 0};
     string cmdchar[4] = {"A", "S", "D", "W"};
-    string move(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
+    string move(vector<vector<boardloader::Cell>> &board, const boardloader::Point &from, const boardloader::Point &to)
     {
         vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
         cost[from.y][from.x] = 0;
