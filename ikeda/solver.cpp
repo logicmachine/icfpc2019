@@ -11,6 +11,8 @@ int main(int argc, char *argv[])
     auto blocks = ikeda::largest_rectangle(board);
     //auto graph = ikeda::get_graph(board, ret);
 
+    ikeda::init_board(board.size(), board[0].size());
+
     vector<int> used(blocks.size(), 0);
     boardloader::Point p(x, y);
     int dir = 1; // 0123 -> urdl
@@ -28,8 +30,11 @@ int main(int argc, char *argv[])
         }
         used[targ] = 1;
         auto tmp = ikeda::move(board, p, blocks[targ].small);
+        //cout << " " << p << " " << blocks[targ].small << endl;
+        //cout << tmp << endl;
+        ikeda::paint_string(p, dir, tmp);
+        //cout << " " << p << " " << blocks[targ].small << endl;
         std::cout << tmp;
-        p = blocks[targ].small;
         ikeda::paint(board, blocks[targ], p, dir);
     }
     cout << endl;
