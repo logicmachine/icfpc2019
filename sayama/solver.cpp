@@ -220,7 +220,7 @@ void Worker::wrap()
     {
         const int ny = y + v.y;
         const int nx = x + v.x;
-        if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle)
         {
             table[ny][nx] = Cell::Occupied;
         }
@@ -259,9 +259,9 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     dx = { 0, -1, 0, 1 };
 
     manipulator_list.emplace_back(0, 0);
-    manipulator_list.emplace_back(1, 0);
+    manipulator_list.emplace_back(0, 1);
     manipulator_list.emplace_back(1, 1);
-    manipulator_list.emplace_back(1, -1);
+    manipulator_list.emplace_back(-1, 1);
 }
 
 bool Worker::bfs()
@@ -278,7 +278,7 @@ bool Worker::bfs()
         Point p = que.front();
         que.pop();
 
-        if (table[p.y][p.x] == Cell::Empty)
+        if (table[p.y][p.x] != Cell::Obstacle && table[p.y][p.x] != Cell::Occupied)
         {
             std::vector<Direction> move_list;
             while (p.y != y || p.x != x)
@@ -334,13 +334,15 @@ void Worker::dfs_with_restart()
     while (true)
     {
         table[y][x] = Cell::Occupied;
+        wrap();
+
         selected.clear();
 
         for (int i = 0; i < 4; i++)
         {
             const int ny = y + dy[i];
             const int nx = x + dx[i];
-            if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+            if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied)
             {
                 const Direction dir = static_cast<Direction>(i);
                 selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
@@ -369,7 +371,7 @@ void Worker::dfs(int cy, int cx)
     {
         const int ny = cy + dy[i];
         const int nx = cx + dx[i];
-        if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied)
         {
             const Direction dir = static_cast<Direction>(i);
             move(dir);

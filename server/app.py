@@ -99,7 +99,7 @@ def submit():
 @app.route('/make-zip')
 def make_zip():
     conn = get_db()
-    query = 'select problem_id, content from solutions group by problem_id'
+    query = 'select problem_id, min(score), content from solutions group by problem_id'
     response = make_response()
     with TemporaryFile() as tf, ZipFile(tf, mode='w') as zf:
         for row in conn.execute(query):
