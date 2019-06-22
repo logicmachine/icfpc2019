@@ -4,7 +4,7 @@ import requests
 from tempfile import TemporaryFile
 from zipfile import ZipFile
 
-from flask import Flask, g, request, render_template, make_response
+from flask import Flask, g, request, render_template, make_response, abort
 
 app = Flask(__name__)
 
@@ -34,6 +34,42 @@ def index():
         for row in conn.execute(query)
     ]
     return render_template('index.html', problems=problems)
+
+@app.route('/details/<int:problem_id>')
+def details(problem_id):
+    conn = get_db()
+    problem = { 'problem_id': problem_id }
+    submissions_query = '''
+    select id, score, author, created_at
+      from solutions
+      where problem_id=?
+      order by score asc
+    '''
+    submissions = [
+        {
+            'id': row['id'],
+            'score': row['score'],
+            'author': row['author'],
+            'created_at': row['created_at']
+        }
+        for row in conn.execute(submissions_query, (problem_id,))
+    ]
+    return render_template('details.html', problem=problem, submissions=submissions)
+
+@app.route('/download/<int:submission_id>')
+def download(submission_id):
+    conn = get_db()
+    query = 'select problem_id, content from solutions where id=?'
+    row = conn.execute(query, (submission_id,)).fetchone()
+    if row is None:
+        abort(404)
+    name = 'prob-{:03d}-{:05d}.sol'.format(row['problem_id'], submission_id)
+    response = make_response()
+    response.data = row['content']
+    response.headers['Content-Disposition'] = 'attachment; filename={}'.format(name)
+    response.mimetype = 'text/plain'
+    return response
+
 
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
