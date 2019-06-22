@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <queue>
 #include <stack>
+#include <tuple>
 
 using boardloader::Cell;
 using boardloader::load_board;
@@ -12,6 +13,53 @@ using boardloader::Table;
 
 namespace xyzworker
 {
+
+class Cluster
+{
+public:
+    Table<int> clustering_by_bfs(Table<Cell>& board, std::vector<Point>& point_list);
+};
+
+Table<int> Cluster::clustering_by_bfs(Table<Cell>& board, std::vector<Point>& point_list)
+{
+    std::array<int, 4> dx = { 0, 1, 0, -1 };
+    std::array<int, 4> dy = { 1, 0, -1, 0 };
+
+    const int height = board.size();
+    const int width = board[0].size();
+
+    constexpr int NONE = -1;
+
+    Table<int> ret(height, std::vector<int>(width, NONE));
+
+    std::queue<std::pair<int, Point>> que;
+    for (int i = 0; i < point_list.size(); i++)
+    {
+        que.emplace(i, point_list[i]);
+        ret[point_list[i].y][point_list[i].x] = i;
+    }
+
+    while (!que.empty())
+    {
+        int id;
+        Point p;
+        std::tie(id, p) = que.front();
+        que.pop();
+
+        for (int i = 0; i < 4; i++)
+        {
+            const int ny = p.y + dy[i];
+            const int nx = p.x + dx[i];
+
+            if (0 <= ny && ny < height && 0 <= nx && nx < width && board[ny][nx] != Cell::Obstacle && ret[ny][nx] == NONE)
+            {
+                ret[ny][nx] = id;
+                que.emplace(id, Point(ny, nx));
+            }
+        }
+    }
+    return ret;
+}
 
 enum class Direction
 {
@@ -97,6 +145,8 @@ enum class ActionType
     Attatch,
     FastWheels,
     Drill,
+    Cloning,
+    Teleport,
 };
 
 class Action
@@ -150,6 +200,10 @@ public:
             return "F";
         case ActionType::Drill:
             return "L";
+        case ActionType::Cloning:
+            return "C";
+        case ActionType::Teleport:
+            return "R";
         }
     }
 };
@@ -160,9 +214,28 @@ public:
     Worker(Table<Cell>& table, int y, int x);
     std::vector<Action> solve();
 
-    Worker(Worker& src);
+    void init(Table<Cell>& table, int y, int x);
 
-    Worker clone();
+    Worker();
+    Worker(const Worker& src);
+    void copy_from(const Worker& src);
+
+    Table<Cell>& get_table();
+
+    std::vector<Action>& get_action_list();
+
+    std::vector<Point> gather(Cell cell);
+
+    template <typename FUNCTION>
+    bool bfs_move(FUNCTION condition);
+
+    void dfs_with_restart();
+
+    // Command
+
+    void move(Direction dir);
+
+    void clone_command();
 
 private:
     void rotate_clockwise();
@@ -171,11 +244,9 @@ private:
     void wrap();
 
     template <typename FUNCTION>
-    bool bfs_move(FUNCTION condition);
-    void dfs(int cy, int cx);
-    void dfs_with_restart();
+    std::vector<Point> gather_internal(FUNCTION condition);
 
-    void move(Direction dir);
+    void dfs(int cy, int cx);
 
     bool is_empty(int cy, int cx);
 
@@ -191,8 +262,8 @@ private:
     int y;
     int x;
 
-    int height();
-    int width();
+    int height() const;
+    int width() const;
 
     bool reset_to_small_region();
 
@@ -204,7 +275,65 @@ private:
     std::array<int, 4> dy;
 };
 
-Worker::Worker(Worker& src)
+void Worker::init(Table<Cell>& table, int y, int x)
+{
+    this->y = y;
+    this->x = x;
+
+    this->table.resize(table.size());
+    for (int i = 0; i < table.size(); i++)
+    {
+        this->table[i].resize(table[i].size());
+        for (int j = 0; j < table[0].size(); j++)
+        {
+            this->table[i][j] = table[i][j];
+        }
+    }
+
+    // Up, Left, Down, Right
+    dy = { 1, 0, -1, 0 };
+    dx = { 0, -1, 0, 1 };
+
+    manipulator_list.emplace_back(0, 0);
+    manipulator_list.emplace_back(0, 1);
+    manipulator_list.emplace_back(1, 1);
+    manipulator_list.emplace_back(-1, 1);
+}
+
+std::vector<Action>& Worker::get_action_list()
+{
+    return action_list;
+}
+
+Table<Cell>& Worker::get_table()
+{
+    return table;
+}
+
+std::vector<Point> Worker::gather(Cell cell)
+{
+    return gather_internal<>([&](int y, int x) { return table[y][x] == cell; });
+}
+
+template <typename FUNCTION>
+std::vector<Point> Worker::gather_internal(FUNCTION condition)
+{
+    std::vector<Point> ret;
+
+    for (int i = 0; i < height(); i++)
+    {
+        for (int j = 0; j < width(); j++)
+        {
+            if (condition(i, j))
+            {
+                ret.emplace_back(i, j);
+            }
+        }
+    }
+    return ret;
+}
+
+void Worker::copy_from(const Worker& src)
 {
     // table
     table.resize(src.table.size());
@@ -237,9 +366,27 @@ Worker::Worker(Worker& src)
     }
 }
 
+Worker::Worker(const Worker& src)
+{
+    if (this != &src)
+    {
+        copy_from(src);
+    }
+}
+
+Worker::Worker()
+{
+}
+
 bool Worker::is_empty(int cy, int cx)
 {
     return table[cy][cx] != Cell::Obstacle && table[cy][cx] != Cell::Occupied;
+}
+
+void Worker::clone_command()
+{
+    assert(table[y][x] == Cell::Mysterious);
+    action_list.push_back(ActionType::Cloning);
 }
 
 void Worker::move(Direction dir)
@@ -255,12 +402,12 @@ bool Worker::is_inside(int cy, int cx)
     return 0 <= cy && cy < height() && 0 <= cx && cx < width();
 }
 
-int Worker::height()
+int Worker::height() const
 {
     return table.size();
 }
 
-int Worker::width()
+int Worker::width() const
 {
     return table[0].size();
 }
@@ -283,10 +430,10 @@ void Worker::rotate_clockwise()
 {
     for (auto& p : manipulator_list)
     {
-        int py = p.y;
-        int px = p.x;
-        p.y = -p.x;
-        p.x = p.y;
+        const int py = p.y;
+        const int px = p.x;
+        p.y = -px;
+        p.x = py;
     }
 }
 
@@ -294,26 +441,16 @@ void Worker::rotate_counterclockwise()
 {
     for (auto& p : manipulator_list)
     {
-        int py = p.y;
-        int px = p.x;
-        p.y = p.x;
-        p.x = -p.y;
+        const int py = p.y;
+        const int px = p.x;
+        p.y = px;
+        p.x = -py;
     }
 }
 
 Worker::Worker(Table<Cell>& table, int y, int x)
-    : table(table)
-    , y(y)
-    , x(x)
 {
-    // Up, Left, Down, Right
-    dy = { 1, 0, -1, 0 };
-    dx = { 0, -1, 0, 1 };
-
-    manipulator_list.emplace_back(0, 0);
-    manipulator_list.emplace_back(0, 1);
-    manipulator_list.emplace_back(1, 1);
-    manipulator_list.emplace_back(-1, 1);
+    init(table, y, x);
 }
 
 template <typename FUNCTION>
@@ -505,25 +642,90 @@ class Solver
 public:
     Solver(Table<Cell> table, int start_y, int start_x);
 
-    std::vector<Action> solve();
+    std::vector<std::vector<Action>> solve();
+
+    void fill_obstacle(const Table<int>& cluster, Table<Cell>& table, int id);
 
 private:
-    Worker worker;
+    std::vector<Worker> worker_list;
+    Cluster cluster;
 };
 
-Solver::Solver(Table<Cell> table, int start_y, int start_x)
-    : worker(table, start_y, start_x)
+void Solver::fill_obstacle(const Table<int>& cluster, Table<Cell>& table, int id)
 {
+    const int height = cluster.size();
+    const int width = cluster[0].size();
+
+    for (int i = 0; i < height; i++)
+    {
+        for (int j = 0; j < width; j++)
+        {
+            if (cluster[i][j] != id)
+            {
+                table[i][j] = Cell::Obstacle;
+            }
+        }
+    }
 }
 
-std::vector<Action> Solver::solve()
+Solver::Solver(Table<Cell> table, int start_y, int start_x)
 {
-    return worker.solve();
+    worker_list.resize(1000);
+    worker_list[0].init(table, start_y, start_x);
+}
+
+std::vector<std::vector<Action>> Solver::solve()
+{
+    std::vector<Point> clone_point = worker_list[0].gather(Cell::Cloning);
+
+    std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
+
+    const int num_clone = std::max(0, std::min<int>(clone_point.size(), mysterious_point.size() - 1));
+
+    clone_point.resize(num_clone);
+    mysterious_point.resize(num_clone + 1);
+
+    // Clustering の結果を収集
+
+    Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), mysterious_point);
+
+    // Clone 命令を実行
+    // TODO: スケジューリング
+    for (int i = 0; i < num_clone; i++)
+    {
+        // 最短経路で clone 回収
+        worker_list[0].bfs_move([&](Point& p) { return p == clone_point[i]; });
+    }
+
+    // それぞれの worker に対して、全て map を 自分の id 以外塗りつぶす
+    for (int i = 0; i < num_clone; i++)
+    {
+        worker_list[i].bfs_move([&](Point& p) { return p == mysterious_point[i]; });
+        worker_list[i + 1].copy_from(worker_list[i]);
+        worker_list[i].clone_command();
+        fill_obstacle(clustering_result, worker_list[i].get_table(), i);
+        worker_list[i].dfs_with_restart();
+    }
+
+    auto& last = worker_list[num_clone];
+
+    // 最後のやつは 自分のエリアを担当
+    last.bfs_move([&](Point& p) { return p == mysterious_point.back(); });
+    fill_obstacle(clustering_result, last.get_table(), num_clone);
+    last.dfs_with_restart();
+
+    std::vector<std::vector<Action>> ret;
+    for (int i = 0; i <= num_clone; i++)
+    {
+        ret.push_back(worker_list[i].get_action_list());
+    }
+
+    return ret;
 }
 
 } // namespace xyzworker
 
-void save_action(const std::vector<xyzworker::Action>& action_list, const std::string& filepath)
+void save_action(const std::vector<std::vector<xyzworker::Action>>& action_table, const std::string& filepath)
 {
     std::ofstream fout;
     fout.open(filepath);
@@ -534,9 +736,18 @@ void save_action(const std::vector<xyzworker::Action>& action_list, const std::s
         return;
     }
 
-    for (auto action : action_list)
+    bool first = true;
+    for (auto& action_list : action_table)
     {
-        fout << action.to_string();
+        if (!first)
+        {
+            fout << "#";
+        }
+        first = false;
+        for (auto action : action_list)
+        {
+            fout << action.to_string();
+        }
     }
     fout.close();
 }
