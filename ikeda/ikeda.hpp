@@ -696,5 +696,49 @@ namespace ikeda
         return generate_points(tate, yoko);
     }
 
+    void connect(vector<string> &board, set<pair<int, int>> ng, pair<int, int> pos)
+    {
+        vector<vector<int>> len(board.size(), vector<int>(board[0].size(), 1010001000));
+        for (int i = 0; i < board.size(); i++) {
+            for (int j = 0; j < board[0].size(); j++) {
+                if (ng.find({i, j}) != ng.end()) len[i][j] = -1;
+            }
+        }
+        deque<pair<int, pair<int, int>>> q;
+        len[pos.first][pos.second] = 0;
+        q.push_front({0, pos});
+        int finx = -100, finy = -100;
+        while (!q.empty()) {
+            auto pp = q.front(); q.pop_front();
+            if (pp.first != len[pp.second.first][pp.second.second]) continue;
+            for (int i = 0; i < 4; i++) {
+                int ny = pp.second.first + dxy[i], nx = pp.second.second + dxy[i+1];
+                if (0 <= ny && ny < board.size() && 
+                        0 <= nx && nx < board[0].size() && 
+                        len[ny][nx] != -1 && 
+                        len[ny][nx] > len[pp.second.first][pp.second.second] + 1) {
+                    len[ny][nx] = len[pp.second.first][pp.second.second] + 1;
+                    q.push_back({len[ny][nx], {ny, nx}});
+                    if (board[ny][nx] == '#' && 
+                            (finx == -100 || len[finy][finx] > len[ny][nx])) {
+                        finy = ny; finx = nx;
+                    }
+                }
+            }
+        }
+        while (finy != pos.first || finx != pos.second) {
+            board[finy][finx] = '#';
+            for (int i = 0; i < 4; i++) {
+                int ny = finy + dxy[i], nx = finx + dxy[i+1];
+                if (0 <= ny && ny < board.size() && 
+                        0 <= nx && nx < board[0].size() && 
+                        len[ny][nx] == len[finy][finx]-1) {
+                    finy = ny; finx = nx;
+                    break;
+                }
+            }
+        }
+        board[pos.first][pos.second] = '#';
+    }
 }
 
