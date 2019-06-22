@@ -1,4 +1,5 @@
 #include "bits/stdc++.h"
+#include "unistd.h"
 
 #include "../sayama/board_loader.hpp"
 
@@ -55,6 +56,21 @@ public:
     vector<vector<Cell>> field;
     vector<Action> action_log;
     
+    Worker( int yy, int xx, vector<vector<Cell>> &field ): y(yy), x(xx), dir_(Right), field(field){
+        H = (int)field.size();
+        W = (int)field[0].size();
+        
+        speed_ = 1;
+        
+        manipulators_.push_back( make_pair( 0, 0 ) );
+        for( int i=0; i<MANIP_NUM; ++i ){
+            manipulators_.push_back( make_pair( manip_y[i], manip_x[i] ) );
+        }
+        applyPaint( y, x, manipulators_ );
+
+    }
+
+
     bool isIntersectLineSeg( double y1, double x1, double y2, double x2, double y3, double x3, double y4, double x4 ){
         double ta=(x1-x2)*(y3-y1)+(y1-y2)*(x1-x3);
         double tb=(x1-x2)*(y4-y1)+(y1-y2)*(x1-x4);
@@ -75,9 +91,9 @@ public:
         int dx[] = {0, 1, 1, 0, 0};
         for( int i=min(src_y, dst_y); i<max(src_y, dst_y); ++i ){
             for( int j=min(src_x, dst_x); j<max(src_x, dst_x); ++j ){
-                if( field[i][j] != boardloader::Obstacle )continue;
                 for( int k=0; k<4; ++k ){
-                    if( isIntersect( src_y+0.5, src_x+0.5, dst_y+0.5, dst_x+0.5, i+dy[k], j+dx[k], i+dy[k+1], j+dx[k+1] ) ){
+                    if( field[i][j] == boardloader::Obstacle and isIntersect( src_y+0.5, src_x+0.5, dst_y+0.5, dst_x+0.5, i+dy[k], j+dx[k], i+dy[k+1], j+dx[k+1] ) ){
+                        cout << "field[" << i << "][" << j << "] = " << field[i][j] << " " << "intersect : " << src_y+0.5 << "_" << src_x+0.5 << " " << dst_y+0.5 << "_" << dst_x+0.5 << " " << i+dy[k] << "_" << j+dx[k] << " " << i+dy[k+1] << "_" << j+dx[k+1] << endl;
                         return false;
                     }
                 }
@@ -88,31 +104,27 @@ public:
     
     void applyPaint( const int& cur_y, const int& cur_x, const vector<pair<int,int>>& manip ){
         assert( field[cur_y][cur_x] != boardloader::Obstacle );
-        field[cur_y][cur_x] = boardloader::Occupied;
         
-        for( int i=0; i<manipulators_.size(); ++i ){
+        for( int i=0; i<manip.size(); ++i ){
             int ty, tx;
-            tie(ty, tx) = manipulators_[i];
+            tie(ty, tx) = manip[i];
+            ty += cur_y;
+            tx += cur_x;
+
             if( ty<0 or ty>=H or tx<0 or tx>=W )continue;
-            if( field[ty][tx] != boardloader::Obstacle && not isReachable( cur_y, cur_x, ty, tx ) ){
+
+            if( field[ty][tx] == boardloader::Obstacle ){
+                /* cout << "There is Obstacle " << ty << " " << tx << endl; */;
+                
+            }else if( not isReachable( cur_y, cur_x, ty, tx ) ){
+                /* cout << "Not reachable " << ty << " " << tx << endl; */;
+            }else{
                 field[ty][tx] = boardloader::Occupied;
             }
         }
     }
-    
-    Worker( int yy, int xx, vector<vector<Cell>> &field ): y(yy), x(xx), dir_(Right), field(field){
-        H = (int)field.size();
-        W = (int)field[0].size();
-        
-        applyPaint( y, x, manipulators_ );
-        speed_ = 1;
-        
-        manipulators_.push_back( make_pair( y, x ) );
-        for( int i=0; i<MANIP_NUM; ++i ){
-            manipulators_.push_back( make_pair( y + manip_y[i], x + manip_x[i] ) );
-        }
-    }
-    
+
+
     bool doAction( Action act ){
         if( act.opcode == "W" ){ // move_up
             if( y+1 >= H or field[y+1][x]==boardloader::Obstacle ){
@@ -130,14 +142,12 @@ public:
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
                     
                     applyPaint( moved_y, moved_x, manipulators_ );
-                    
+
                     y_new = y+d;
                 }
                 assert( y_new < H );
                 y = y_new;
                 
-                action_log.push_back( act );
-                return true;
             }
             
         }else if( act.opcode == "S" ){ // move_down
@@ -156,14 +166,12 @@ public:
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
                     
                     applyPaint( moved_y, moved_x, manipulators_ );
-                    
+
                     y_new = y-d;
                 }
                 assert( y_new>=0 );
                 y = y_new;
                 
-                action_log.push_back( act );
-                return true;
             }
             
         }else if( act.opcode == "A" ){ // move_left
@@ -182,14 +190,12 @@ public:
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
                     
                     applyPaint( moved_y, moved_x, manipulators_ );
-                    
+
                     x_new = x-d;
                 }
                 assert( x_new >= 0 );
                 x = x_new;
-                
-                action_log.push_back( act );
-                return true;
+
             }
             
         }else if( act.opcode == "D" ){ // move_right
@@ -208,38 +214,29 @@ public:
                     if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
                     
                     applyPaint( moved_y, moved_x, manipulators_ );
-                    
+
                     x_new = x+d;
                 }
                 assert( x_new < W );
                 x = x_new;
                 
-                action_log.push_back( act );
-                return true;
             }
             
         }else if( act.opcode == "Z" ){ // do_nothing
-            action_log.push_back( act );
-            return true;
+            /* */;
             
         }else if( act.opcode == "E" ){ // turn_clockwize
             dir_ = static_cast<Direction>((dir_+1)%4);
             for( int i=0; i<manipulators_.size(); ++i ){
                 manipulators_[i] = make_pair( manipulators_[i].second, -manipulators_[i].first );
             }
-            
-            action_log.push_back( act );
-            return true;
-            
+                        
         }else if( act.opcode == "Q" ){ // turn_counterclockwize
             dir_ = static_cast<Direction>((dir_+3)%4);
             
             for( int i=0; i<manipulators_.size(); ++i ){
                 manipulators_[i] = make_pair( -manipulators_[i].second, manipulators_[i].first );
-            }
-            
-            action_log.push_back( act );
-            return true;
+            }            
             
         }else if( act.opcode == "B" ){ // attach B
             assert( act.operand.first  == -1 );
@@ -255,6 +252,14 @@ public:
             error( "The action " + act.opcode + " is not defined" );
             return false;
         }
+
+        applyPaint( y, x, manipulators_ );
+
+        sleep(1);
+        boardloader::print_table( field, y, x );
+        cout << endl;
+        action_log.push_back( act );
+        return true;
     }
     
     bool isMovable( int dy, int dx ){
