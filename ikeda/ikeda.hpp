@@ -265,7 +265,7 @@ namespace ikeda
         return graph;
     }
 
-    string cmdchar[4] = {"A", "W", "D", "S"};
+    string cmdchar[4] = {"A", "S", "D", "W"};
     string move(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
     {
         vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
@@ -360,16 +360,16 @@ namespace ikeda
                 move_right(p);
                 move_right(p);
             }
-            dir_to_down(dir);
-            for (int i = block.small.y; i <= block.large.y; i++) {
+            dir_to_up(dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
                 move_up(p);
             }
             dir_to_right(dir);
             move_right(p);
             move_right(p);
             move_right(p);
-            dir_to_up(dir);
-            for (int i = block.small.y; i <= block.large.y; i++) {
+            dir_to_down(dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
                 move_down(p);
             }
             dir_to_right(dir);
@@ -381,16 +381,16 @@ namespace ikeda
                 move_right(p);
             }
             fl = true;
-            dir_to_down(dir);
-            for (int i = block.small.y; i <= block.large.y; i++) {
+            dir_to_up(dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
                 move_up(p);
             }
             dir_to_right(dir);
             for (int i = 0; i < (block.large.x - block.small.x + 1) % 3; i++) {
                 move_right(p);
             }
-            dir_to_up(dir);
-            for (int i = block.small.y; i <= block.large.y; i++) {
+            dir_to_down(dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
                 move_down(p);
             }
             dir_to_right(dir);
@@ -401,8 +401,8 @@ namespace ikeda
                 }
             }
             fl = true;
-            dir_to_down(dir);
-            for (int i = block.small.y; i <= block.large.y; i++) {
+            dir_to_up(dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
                 move_up(p);
             }
         }
