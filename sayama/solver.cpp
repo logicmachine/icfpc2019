@@ -861,22 +861,22 @@ std::vector<std::vector<Action>> Solver::solve()
 
     Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), mysterious_point);
 
-    // それぞれの worker に対して、全て map を 自分の id 以外塗りつぶす
-    for (int i = 0; i < num_clone; i++)
+    const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
+    worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
+
+    for (int i = 1; i <= num_clone; i++)
     {
+        worker_list[i].copy_from(worker_list[0]);
+        worker_list[0].clone_command();
+
         worker_list[i].bfs_move([&](Point& p) { return p == mysterious_point[i]; });
-        worker_list[i + 1].copy_from(worker_list[i]);
-        worker_list[i].clone_command();
         fill_obstacle(clustering_result, worker_list[i].get_table(), i);
         worker_list[i].dfs_with_restart();
     }
 
-    auto& last = worker_list[num_clone];
-
-    // 最後のやつは 自分のエリアを担当
-    last.bfs_move([&](Point& p) { return p == mysterious_point.back(); });
-    fill_obstacle(clustering_result, last.get_table(), num_clone);
-    last.dfs_with_restart();
+    worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[0]; });
+    fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
+    worker_list[0].dfs_with_restart();
 
     std::vector<std::vector<Action>> ret;
     for (int i = 0; i <= num_clone; i++)
