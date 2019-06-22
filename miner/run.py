@@ -19,7 +19,7 @@ def main():
     yaml_file = sys.argv[1]
     solution_root = os.path.dirname(yaml_file)
 
-    client_root = '/home/ubuntu/icfpc2019/lambda-client'
+    client_root = '/home/ubuntu/lambda-client'
     current_block = get_current_block(client_root)
     block_root = os.path.join(client_root, 'blocks', str(current_block))
     task_file = os.path.abspath(os.path.join(block_root, 'task.desc'))
