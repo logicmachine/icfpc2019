@@ -1,5 +1,7 @@
 #include "board_loader.hpp"
 
+//#include "../ccl.hpp"
+
 #include <algorithm>
 #include <queue>
 #include <stack>
@@ -220,7 +222,8 @@ void Worker::wrap()
     {
         const int ny = y + v.y;
         const int nx = x + v.x;
-        if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle)
+        //if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        if (is_inside(ny, nx) && (table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied))
         {
             table[ny][nx] = Cell::Occupied;
         }
@@ -259,9 +262,9 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     dx = { 0, -1, 0, 1 };
 
     manipulator_list.emplace_back(0, 0);
-    manipulator_list.emplace_back(0, 1);
+    manipulator_list.emplace_back(1, 0);
     manipulator_list.emplace_back(1, 1);
-    manipulator_list.emplace_back(-1, 1);
+    manipulator_list.emplace_back(1, -1);
 }
 
 bool Worker::bfs()
@@ -278,6 +281,7 @@ bool Worker::bfs()
         Point p = que.front();
         que.pop();
 
+        //if (table[p.y][p.x] == Cell::Empty)
         if (table[p.y][p.x] != Cell::Obstacle && table[p.y][p.x] != Cell::Occupied)
         {
             std::vector<Direction> move_list;
@@ -334,7 +338,12 @@ void Worker::dfs_with_restart()
     while (true)
     {
         table[y][x] = Cell::Occupied;
-        wrap();
+
+        if (x+1 < table[0].size()) {
+            if (table[y][x+1] == Cell::Empty) table[y][x+1] = Cell::Occupied;
+            if (y+1 < table.size() && table[y+1][x+1] == Cell::Empty) table[y+1][x+1] = Cell::Occupied;
+            if (y-1 >= 0 && table[y-1][x+1] == Cell::Empty) table[y-1][x+1] = Cell::Occupied;
+        }
 
         selected.clear();
 
@@ -342,7 +351,7 @@ void Worker::dfs_with_restart()
         {
             const int ny = y + dy[i];
             const int nx = x + dx[i];
-            if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied)
+            if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
             {
                 const Direction dir = static_cast<Direction>(i);
                 selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
@@ -371,7 +380,8 @@ void Worker::dfs(int cy, int cx)
     {
         const int ny = cy + dy[i];
         const int nx = cx + dx[i];
-        if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied)
+        //if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        if (is_inside(ny, nx) && (table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied))
         {
             const Direction dir = static_cast<Direction>(i);
             move(dir);

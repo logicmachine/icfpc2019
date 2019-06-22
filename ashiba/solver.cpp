@@ -8,7 +8,7 @@ using boardloader::Cell;
 using boardloader::load_board;
 using boardloader::print_table;
 
-const int MANIP_NUM = 3;
+const int DEFAULT_MANIP_NUM = 3;
 const int manip_y[] = {1, 0, -1};
 const int manip_x[] = {1, 1, 1};
 
@@ -46,31 +46,49 @@ public:
 
 class Worker{
     int H, W;
-    Direction dir_;
-    vector<pair<int,int>> manipulators_;
+    vector<vector<pair<int,int>>> manipulators_;
+    vector<vector<Action>> action_log;
+    vector<Direction> dir_;
+    vector<int> speed_;
+    
     map<Item,int> items_;
-    int speed_;
+    int robot_num;
+    
     
 public:
-    int y, x;
+    vector<int> y, x;
     vector<vector<Cell>> field;
-    vector<Action> action_log;
     
-    Worker( int yy, int xx, vector<vector<Cell>> &field ): y(yy), x(xx), dir_(Right), field(field){
+    Worker( int yy, int xx, vector<vector<Cell>> &field ): field(field){
         H = (int)field.size();
         W = (int)field[0].size();
         
-        speed_ = 1;
+        robot_num = 1;
         
-        manipulators_.push_back( make_pair( 0, 0 ) );
-        for( int i=0; i<MANIP_NUM; ++i ){
-            manipulators_.push_back( make_pair( manip_y[i], manip_x[i] ) );
+        manipulators_.resize( robot_num );
+        action_log   .resize( robot_num );
+        dir_         .resize( robot_num );
+        speed_       .resize( robot_num );
+        y            .resize( robot_num );
+        x            .resize( robot_num );
+
+        y[0]      = yy;
+        x[0]      = xx;
+        dir_[0]   = Right;
+        speed_[0] = 1;
+
+        manipulators_[0].push_back( make_pair( 0, 0 ) );
+        for( int i=0; i<DEFAULT_MANIP_NUM; ++i ){
+            manipulators_[0].push_back( make_pair( manip_y[i], manip_x[i] ) );
         }
-        applyPaint( y, x, manipulators_ );
 
+        applyPaint( y[0], x[0], manipulators_[0] );
+
+        assert( items_.size() == 0 );
+        assert( robot_num == 1 );
     }
-
-
+    
+    
     bool isIntersectLineSeg( double y1, double x1, double y2, double x2, double y3, double x3, double y4, double x4 ){
         double ta=(x1-x2)*(y3-y1)+(y1-y2)*(x1-x3);
         double tb=(x1-x2)*(y4-y1)+(y1-y2)*(x1-x4);
@@ -110,9 +128,9 @@ public:
             tie(ty, tx) = manip[i];
             ty += cur_y;
             tx += cur_x;
-
+            
             if( ty<0 or ty>=H or tx<0 or tx>=W )continue;
-
+            
             if( field[ty][tx] == boardloader::Obstacle ){
                 /* cout << "There is Obstacle " << ty << " " << tx << endl; */;
                 
@@ -123,145 +141,159 @@ public:
             }
         }
     }
-
-
-    bool doAction( Action act ){
-        if( act.opcode == "W" ){ // move_up
-            if( y+1 >= H or field[y+1][x]==boardloader::Obstacle ){
-                return false;
-            }else{
-                int y_new = y;
-                for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y+d;
-                    int moved_x = x;
-                    
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
-                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
-                    
-                    applyPaint( moved_y, moved_x, manipulators_ );
-
-                    y_new = y+d;
-                }
-                assert( y_new < H );
-                y = y_new;
-                
-            }
+    
+    
+    bool doAction( vector<Action> act_list ){
+        assert( act_list.size() <= robot_num );
+        
+        for( int rb=0; rb<robot_num; ++rb ){
+            Action act = act_list[rb];
             
-        }else if( act.opcode == "S" ){ // move_down
-            if( y-1 < 0 or field[y-1][x] == boardloader::Obstacle ){
-                return false;
-            }else{
-                int y_new = y-1;
-                for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y-d;
-                    int moved_x = x;
-                    
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
-                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
-                    
-                    applyPaint( moved_y, moved_x, manipulators_ );
-
-                    y_new = y-d;
-                }
-                assert( y_new>=0 );
-                y = y_new;
-                
-            }
-            
-        }else if( act.opcode == "A" ){ // move_left
-            if( x-1<0 or field[y][x-1] == boardloader::Obstacle ){
-                return false;
-            }else{
-                int x_new = x-1;
-                for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y;
-                    int moved_x = x-d;
-                    
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
-                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
-                    
-                    applyPaint( moved_y, moved_x, manipulators_ );
-
-                    x_new = x-d;
-                }
-                assert( x_new >= 0 );
-                x = x_new;
-
-            }
-            
-        }else if( act.opcode == "D" ){ // move_right
-            if( x+1>=W or field[y][x+1] == boardloader::Obstacle ){
-                return false;
-            }else{
-                int x_new = x+1;
-                for( int d=1; d<=speed_; ++d ){
-                    int moved_y = y;
-                    int moved_x = x+d;
-                    
-                    if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
-                    if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
-                    if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
-                    if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                    if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
-                    
-                    applyPaint( moved_y, moved_x, manipulators_ );
-
-                    x_new = x+d;
-                }
-                assert( x_new < W );
-                x = x_new;
-                
-            }
-            
-        }else if( act.opcode == "Z" ){ // do_nothing
-            /* */;
-            
-        }else if( act.opcode == "E" ){ // turn_clockwize
-            dir_ = static_cast<Direction>((dir_+1)%4);
-            for( int i=0; i<manipulators_.size(); ++i ){
-                manipulators_[i] = make_pair( manipulators_[i].second, -manipulators_[i].first );
-            }
+            if( act.opcode == "W" ){ // move_up
+                if( y[rb]+1 >= H or field[y[rb]+1][x[rb]]==boardloader::Obstacle ){
+                    return false;
+                }else{
+                    int y_new = y[rb];
+                    for( int d=1; d<=speed_[rb]; ++d ){
+                        int moved_y = y[rb]+d;
+                        int moved_x = x[rb];
                         
-        }else if( act.opcode == "Q" ){ // turn_counterclockwize
-            dir_ = static_cast<Direction>((dir_+3)%4);
+                        if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                        if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                        if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                        if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        
+                        applyPaint( moved_y, moved_x, manipulators_[rb] );
+                        
+                        y_new = y[rb]+d;
+                    }
+                    assert( y_new < H );
+                    y[rb] = y_new;
+                    
+                }
+                
+            }else if( act.opcode == "S" ){ // move_down
+                if( y[rb]-1 < 0 or field[y[rb]-1][x[rb]] == boardloader::Obstacle ){
+                    return false;
+                }else{
+                    int y_new = y[rb]-1;
+                    for( int d=1; d<=speed_[rb]; ++d ){
+                        int moved_y = y[rb]-d;
+                        int moved_x = x[rb];
+                        
+                        if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                        if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                        if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                        if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        
+                        applyPaint( moved_y, moved_x, manipulators_[rb] );
+                        
+                        y_new = y[rb]-d;
+                    }
+                    assert( y_new>=0 );
+                    y[rb] = y_new;
+                    
+                }
+                
+            }else if( act.opcode == "A" ){ // move_left
+                if( x[rb]-1<0 or field[y[rb]][x[rb]-1] == boardloader::Obstacle ){
+                    return false;
+                }else{
+                    int x_new = x[rb]-1;
+                    for( int d=1; d<=speed_[rb]; ++d ){
+                        int moved_y = y[rb];
+                        int moved_x = x[rb]-d;
+                        
+                        if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                        if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                        if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                        if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        
+                        applyPaint( moved_y, moved_x, manipulators_[rb] );
+                        
+                        x_new = x[rb]-d;
+                    }
+                    assert( x_new >= 0 );
+                    x[rb] = x_new;
+                    
+                }
+                
+            }else if( act.opcode == "D" ){ // move_right
+                if( x[rb]+1>=W or field[y[rb]][x[rb]+1] == boardloader::Obstacle ){
+                    return false;
+                }else{
+                    int x_new = x[rb]+1;
+                    for( int d=1; d<=speed_[rb]; ++d ){
+                        int moved_y = y[rb];
+                        int moved_x = x[rb]+d;
+                        
+                        if( moved_y<0 or H<=moved_y or moved_x<0 or W<=moved_x or field[moved_y][moved_x]==boardloader::Obstacle )break;
+                        if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
+                        if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
+                        if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
+                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        
+                        applyPaint( moved_y, moved_x, manipulators_[rb] );
+                        
+                        x_new = x[rb]+d;
+                    }
+                    assert( x_new < W );
+                    x[rb] = x_new;
+                    
+                }
+                
+            }else if( act.opcode == "Z" ){ // do_nothing
+                /* */;
+                
+            }else if( act.opcode == "E" ){ // turn_clockwize
+                dir_[rb] = static_cast<Direction>((dir_[rb]+1)%4);
+                for( int i=0; i<manipulators_.size(); ++i ){
+                    manipulators_[rb][i] = make_pair( manipulators_[rb][i].second, -manipulators_[rb][i].first );
+                }
+                
+            }else if( act.opcode == "Q" ){ // turn_counterclockwize
+                dir_[rb] = static_cast<Direction>((dir_[rb]+3)%4);
+                
+                for( int i=0; i<manipulators_[rb].size(); ++i ){
+                    manipulators_[rb][i] = make_pair( -manipulators_[rb][i].second, manipulators_[rb][i].first );
+                }
+                
+            }else if( act.opcode == "B" ){ // attach B
+                assert( act.operand.first  == -1 );
+                assert( act.operand.second == -1 );
+                warning( "Not implemented" );
+                return false;
+                
+            }else if( act.opcode == "F" ){ // attach Fast
+                warning( "Not implemented" );
+                return false;
+                
+            }else if( act.opcode == "R" ){ // attach Fast
+                warning( "Not implemented" );
+                return false;
+                
+            }else if( act.opcode == "C" ){ // attach Fast
+                warning( "Not implemented" );
+                return false;
+                
+            }else{
+                error( "The action " + act.opcode + " is not defined" );
+                return false;
+            }
             
-            for( int i=0; i<manipulators_.size(); ++i ){
-                manipulators_[i] = make_pair( -manipulators_[i].second, manipulators_[i].first );
-            }            
+            applyPaint( y[rb], x[rb], manipulators_[rb] );
             
-        }else if( act.opcode == "B" ){ // attach B
-            assert( act.operand.first  == -1 );
-            assert( act.operand.second == -1 );
-            warning( "Not implemented" );
-            return false;
-            
-        }else if( act.opcode == "F" ){ // attach Fast
-            warning( "Not implemented" );
-            return false;
-            
-        }else{
-            error( "The action " + act.opcode + " is not defined" );
-            return false;
+            boardloader::print_table( field, y[rb], x[rb] );
+            cout << endl;
+            action_log[rb].push_back( act );
         }
-
-        applyPaint( y, x, manipulators_ );
-
-        sleep(1);
-        boardloader::print_table( field, y, x );
-        cout << endl;
-        action_log.push_back( act );
         return true;
     }
-    
+
+    /*
     bool isMovable( int dy, int dx ){
         assert( abs(dy+dx) == 1 and (dy==0 or dx==0) );
         if( y+dy<0 or y+dy>=H or x+dx<0 or x+dx>=W )return false;
@@ -272,6 +304,7 @@ public:
             return true;
         }
     }
+     */
     
     
     bool hasItem( Item item ){
@@ -285,17 +318,23 @@ public:
     }
     
     void dump_actions( ofstream& ofs ){
-        for( auto elm: action_log ){
-            if( elm.operand == make_pair(-1, -1) ){
-                ofs << elm.opcode;
-            }else{
-                if( elm.opcode == "B" ){
-                    ofs << "B" << "(" << elm.operand.first << "," << elm.operand.second << ")";
+        assert( robot_num == action_log.size() );
+        for( int rb=0; rb<robot_num; ++rb ){
+            if( rb != 0 ){
+                ofs << "#";
+            }
+            
+            for( auto elm: action_log[rb] ){
+                if( elm.operand == make_pair(-1, -1) ){
+                    ofs << elm.opcode;
+                }else{
+                    if( elm.opcode == "B" ){
+                        ofs << "B" << "(" << elm.operand.first << "," << elm.operand.second << ")";
+                    }
                 }
             }
         }
     }
-    
 };
 
 
@@ -307,16 +346,16 @@ void dfs( Worker &robot, vector<vector<bool>>& occupied ){
     string direction[] = {"D", "S", "A", "W"};
     
     for( int k=0; k<4; ++k ){
-        int ddy = robot.y + dy[k];
-        int ddx = robot.x + dx[k];
+        int ddy = robot.y[0] + dy[k];
+        int ddx = robot.x[0] + dx[k];
         if( ddy<0 or ddy>=occupied.size() or ddx<0 or ddx>=occupied[0].size() )continue;
         if( not occupied[ddy][ddx] and robot.field[ddy][ddx] != boardloader::Obstacle ){
             occupied[ddy][ddx] = true;
-            assert( robot.doAction( Action(direction[k]) ) );
+            assert( robot.doAction( {Action(direction[k])} ) );
             
             dfs( robot, occupied );
             
-            assert( robot.doAction( Action(direction[(k+2)%4]) ) );
+            assert( robot.doAction( {Action(direction[(k+2)%4])} ) );
             
         }
     }
@@ -337,7 +376,7 @@ int main(){
         Worker robot( start_y, start_x, field );
         
         vector<vector<bool>> occupied( field.size(), vector<bool>(field[0].size(), false) );
-        occupied[robot.y][robot.x] = true;
+        occupied[robot.y[0]][robot.x[0]] = true;
         dfs( robot, occupied );
         
         ofstream sol_fs( filename + ".sol" );
