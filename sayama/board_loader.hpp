@@ -154,6 +154,7 @@ struct Point
     }
 
     std::string to_string();
+    std::string to_string_output();
 };
 
 Point get_direction(const Point& from, const Point& to)
@@ -175,6 +176,11 @@ std::string Point::to_string()
     std::stringstream ss;
     ss << *this;
     return ss.str();
+}
+
+std::string Point::to_string_output()
+{
+    return "(" + std::to_string(x) + "," + std::to_string(y) + ")";
 }
 
 std::string read_all(const std::string& filepath)
