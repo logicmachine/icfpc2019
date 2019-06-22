@@ -725,6 +725,23 @@ std::vector<std::vector<Action>> Solver::solve()
 
 } // namespace xyzworker
 
+void print_action(const std::vector<std::vector<xyzworker::Action>>& action_table, std::ostream& out)
+{
+    bool first = true;
+    for (auto& action_list : action_table)
+    {
+        if (!first)
+        {
+            out << "#";
+        }
+        first = false;
+        for (auto action : action_list)
+        {
+            out << action.to_string();
+        }
+    }
+}
+
 void save_action(const std::vector<std::vector<xyzworker::Action>>& action_table, const std::string& filepath)
 {
     std::ofstream fout;
@@ -736,26 +753,14 @@ void save_action(const std::vector<std::vector<xyzworker::Action>>& action_table
         return;
     }
 
-    bool first = true;
-    for (auto& action_list : action_table)
-    {
-        if (!first)
-        {
-            fout << "#";
-        }
-        first = false;
-        for (auto action : action_list)
-        {
-            fout << action.to_string();
-        }
-    }
+    print_action(action_table, fout);
+
     fout.close();
 }
 
 int main(int argc, char* argv[])
 {
     std::string input_filepath(argv[1]);
-    std::string output_filepath(argv[2]);
 
     int start_y, start_x;
     auto board = load_board(input_filepath, start_y, start_x);
@@ -764,5 +769,5 @@ int main(int argc, char* argv[])
 
     auto result = solver.solve();
 
-    save_action(result, output_filepath);
+    print_action(result, std::cout);
 }
