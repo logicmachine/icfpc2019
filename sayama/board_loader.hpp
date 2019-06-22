@@ -23,6 +23,8 @@ enum Cell
     FastWheels = 'F',
     Drill = 'L',
     Mysterious = 'X',
+    Teleport = 'R',
+    Cloning = 'C',
 };
 
 Cell to_cell(const char ch)
@@ -37,6 +39,10 @@ Cell to_cell(const char ch)
         return Cell::Drill;
     case 'X':
         return Cell::Mysterious;
+    case 'R':
+        return Cell::Teleport;
+    case 'C':
+        return Cell::Cloning;
     }
     assert(false);
 }
