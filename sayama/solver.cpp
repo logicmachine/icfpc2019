@@ -61,6 +61,70 @@ Table<int> Cluster::clustering_by_bfs(Table<Cell>& board, std::vector<Point>& po
     return ret;
 }
 
+class HCPSolver
+{
+public:
+    // start は 0番目とする
+    static std::vector<int> solve(const Table<int>& distance)
+    {
+        constexpr int INF = std::numeric_limits<int>::max() / 100;
+
+        const int dim = distance.size();
+        Table<int> rec(dim, std::vector<int>(1 << dim, INF));
+        Table<int> dp(dim, std::vector<int>(1 << dim, INF));
+
+        dp[0][1] = 0;
+
+        const int all = (1 << dim) - 1;
+
+        for (int S = 1; S <= all; S++)
+        {
+            for (int s = 0; s < dim; s++)
+            {
+                if ((S & (1 << s)) != 0)
+                {
+                    for (int e = 0; e < dim; e++)
+                    {
+                        if (distance[s][e] != INF && (~S & (1 << e)) != 0)
+                        {
+                            const int nS = S | (1 << e);
+                            if (dp[e][nS] > dp[s][S] + distance[s][e])
+                            {
+                                dp[e][nS] = dp[s][S] + distance[s][e];
+                                rec[e][nS] = s;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        int best_end = 0;
+        int ans = INF;
+        for (int i = 0; i < dim; i++)
+        {
+            if (ans > dp[i][all])
+            {
+                ans = dp[i][all];
+                best_end = i;
+            }
+        }
+        std::vector<int> tour;
+        int city = best_end;
+        int S = all;
+        for (int i = 0; i < dim; i++)
+        {
+            const int next = rec[city][S];
+            S &= ~(1 << city);
+            tour.push_back(city);
+            city = next;
+        }
+        std::reverse(tour.begin(), tour.end());
+
+        assert(tour.size() == dim);
+        return tour;
+    }
+};
+
 enum class Direction
 {
     Up,
@@ -229,7 +293,14 @@ public:
     template <typename FUNCTION>
     bool bfs_move(FUNCTION condition);
 
+    template <typename FUNCTION>
+    int shortest_distance_to(const Point& start, FUNCTION condition);
+
     void dfs_with_restart();
+
+    void collect_optimal(std::vector<Point>& target_list);
+
+    int select_shortest(std::vector<Point>& target_list);
 
     // Command
 
@@ -256,8 +327,6 @@ private:
 
     int get_empty_connected_cell(int cy, int cx, int upperbound);
 
-    std::vector<Point> shortest_path(int ty, int tx);
-
     Table<Cell> table;
     int y;
     int x;
@@ -274,6 +343,52 @@ private:
     std::array<int, 4> dx;
     std::array<int, 4> dy;
 };
+
+int Worker::select_shortest(std::vector<Point>& target_list)
+{
+    const Point current(y, x);
+    int index = -1;
+    int best_score = std::numeric_limits<int>::max();
+    for (int i = 0; i < target_list.size(); i++)
+    {
+        const int score = shortest_distance_to(current, [&](const Point& p) -> bool { return target_list[i] == p; });
+        if (best_score > score)
+        {
+            best_score = score;
+            index = i;
+        }
+    }
+    return index;
+}
+
+void Worker::collect_optimal(std::vector<Point>& target_list)
+{
+    const std::size_t dimension = target_list.size();
+
+    std::vector<std::vector<int>> distance(dimension, std::vector<int>(dimension, 0));
+    for (int i = 0; i < dimension; i++)
+    {
+        for (int j = i + 1; j < dimension; j++)
+        {
+            const int d = shortest_distance_to(target_list[i], [&](Point& p) { return p == target_list[j]; });
+            distance[i][j] = distance[j][i] = d;
+        }
+    }
+
+    auto tour = HCPSolver::solve(distance);
+
+    for (auto& idx : tour)
+    {
+        const Point target = target_list[idx];
+
+        bfs_move([&](Point& p) { return p == target; });
+
+        if (table[target.y][target.x] == Cell::ManipulatorExtension)
+        {
+            // do something
+        }
+    }
+}
 
 void Worker::init(Table<Cell>& table, int y, int x)
 {
@@ -451,6 +566,42 @@ void Worker::rotate_counterclockwise()
 Worker::Worker(Table<Cell>& table, int y, int x)
 {
     init(table, y, x);
+}
+
+template <typename FUNCTION>
+int Worker::shortest_distance_to(const Point& start, FUNCTION condition)
+{
+    std::queue<std::pair<Point, int>> que;
+    que.emplace(start, 0);
+
+    Table<bool> visited(height(), std::vector<bool>(width(), false));
+    visited[start.y][start.x] = true;
+
+    while (!que.empty())
+    {
+        int depth;
+        Point p;
+        std::tie(p, depth) = que.front();
+        que.pop();
+
+        if (condition(p))
+        {
+            return depth;
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            const int ny = p.y + dy[i];
+            const int nx = p.x + dx[i];
+
+            if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && !visited[ny][nx])
+            {
+                visited[ny][nx] = true;
+                que.emplace(Point(ny, nx), depth + 1);
+            }
+        }
+    }
+    return 100000;
 }
 
 template <typename FUNCTION>
@@ -676,7 +827,28 @@ Solver::Solver(Table<Cell> table, int start_y, int start_x)
 
 std::vector<std::vector<Action>> Solver::solve()
 {
+    // manipulator を集めて、前にくっつける + Clone 回収
+
     std::vector<Point> clone_point = worker_list[0].gather(Cell::Cloning);
+    std::vector<Point> manipulator_point = worker_list[0].gather(Cell::ManipulatorExtension);
+
+    std::vector<Point> target_list;
+    for (auto& p : clone_point)
+    {
+        target_list.push_back(p);
+    }
+    for (auto& p : manipulator_point)
+    {
+        target_list.push_back(p);
+    }
+
+    int nearest_index = worker_list[0].select_shortest(target_list);
+    int opponent = nearest_index == 0 ? 1 : 0;
+    std::swap(target_list[nearest_index], target_list[opponent]);
+
+    worker_list[0].collect_optimal(target_list);
+
+    // Clone
 
     std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
 
@@ -688,14 +860,6 @@ std::vector<std::vector<Action>> Solver::solve()
     // Clustering の結果を収集
 
     Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), mysterious_point);
-
-    // Clone 命令を実行
-    // TODO: スケジューリング
-    for (int i = 0; i < num_clone; i++)
-    {
-        // 最短経路で clone 回収
-        worker_list[0].bfs_move([&](Point& p) { return p == clone_point[i]; });
-    }
 
     // それぞれの worker に対して、全て map を 自分の id 以外塗りつぶす
     for (int i = 0; i < num_clone; i++)
@@ -740,6 +904,7 @@ void print_action(const std::vector<std::vector<xyzworker::Action>>& action_tabl
             out << action.to_string();
         }
     }
+    out << std::endl;
 }
 
 void save_action(const std::vector<std::vector<xyzworker::Action>>& action_table, const std::string& filepath)
