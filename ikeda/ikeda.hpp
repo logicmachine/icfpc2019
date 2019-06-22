@@ -340,22 +340,60 @@ namespace ikeda
 
     void dir_to_right(int &dir)
     {
+        if (dir == 2) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
         while (dir != 1) {
             dir = (dir+1) % 4;
             cout << "E";
         }
     }
 
+    void dir_to_right(boardloader::Point &p, int &dir)
+    {
+        if (dir == 2) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 1) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+        paint_pos(p, dir);
+    }
+
     void dir_to_down(int &dir)
     {
+        if (dir == 3) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
         while (dir != 2) {
             dir = (dir+1) % 4;
             cout << "E";
         }
     }
 
+    void dir_to_down(boardloader::Point &p, int &dir)
+    {
+        if (dir == 3) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
+        while (dir != 2) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+        paint_pos(p, dir);
+    }
+
     void dir_to_up(int &dir)
     {
+        if (dir == 1) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
         while (dir != 0) {
             dir = (dir+1) % 4;
             cout << "E";
@@ -364,6 +402,10 @@ namespace ikeda
 
     void dir_to_up(boardloader::Point &p, int &dir)
     {
+        if (dir == 1) {
+            dir = (dir+3) % 4;
+            cout << "Q";
+        }
         while (dir != 0) {
             dir = (dir+1) % 4;
             cout << "E";
@@ -455,7 +497,7 @@ namespace ikeda
     void paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
     {
         if (filled(block)) return;
-        dir_to_right(dir);
+        dir_to_right(p, dir);
         bool fl = false;
         if ((block.large.x - block.small.x + 1) > 1) move_right(p, dir);
         for (int j = 0; j < (block.large.x - block.small.x + 1) / 6; j++) {
@@ -469,15 +511,15 @@ namespace ikeda
             for (int i = block.small.y; i < block.large.y; i++) {
                 move_up(p, dir);
             }
-            dir_to_right(dir);
+            dir_to_right(p, dir);
             move_right(p, dir);
             move_right(p, dir);
             move_right(p, dir);
-            dir_to_down(dir);
+            dir_to_down(p, dir);
             for (int i = block.small.y; i < block.large.y; i++) {
                 move_down(p, dir);
             }
-            dir_to_right(dir);
+            dir_to_right(p, dir);
         }
         if ((block.large.x - block.small.x + 1) % 6 >= 4) {
             if (fl) {
@@ -490,15 +532,15 @@ namespace ikeda
             for (int i = block.small.y; i < block.large.y; i++) {
                 move_up(p, dir);
             }
-            dir_to_right(dir);
+            dir_to_right(p, dir);
             for (int i = 0; i < (block.large.x - block.small.x + 1) % 3; i++) {
                 move_right(p, dir);
             }
-            dir_to_down(dir);
+            dir_to_down(p, dir);
             for (int i = block.small.y; i < block.large.y; i++) {
                 move_down(p, dir);
             }
-            dir_to_right(dir);
+            dir_to_right(p, dir);
         } else if ((block.large.x - block.small.x + 1) % 6 >= 1) {
             if (fl) {
                 for (int i = 0; i < (block.large.x - block.small.x + 1) % 3 + 1; i++) {
