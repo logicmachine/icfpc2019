@@ -89,6 +89,11 @@ struct Point
     int y;
     int x;
 
+    static Point None()
+    {
+        return Point(-1, -1);
+    }
+
     Point(int y, int x)
         : y(y)
         , x(x)
