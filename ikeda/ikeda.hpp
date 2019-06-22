@@ -12,6 +12,16 @@ namespace ikeda
     vector<vector<int>> painted;
     int init_fl = 0;
 
+    void debug_print()
+    {
+        for (int i = 0; i < painted.size(); i++) {
+            for (int j = 0; j < painted[0].size(); j++) {
+                cout << painted[i][j] << " ";
+            }
+            cout << endl;
+        }
+    }
+
     void init_board(int h, int w)
     {
         painted.assign(h, vector<int>(w, 0));
@@ -20,20 +30,23 @@ namespace ikeda
 
     void paint_pos(int y, int x)
     {
+        painted[y][x] = 1;
+        /*
         if (init_fl && 0 <= y && y < painted.size()
                 && 0 <= x && x < painted[0].size()) painted[y][x] = 1;
+                */
     }
 
-    int dirdist[4][4][2] {
-        {{1, 0}, {2, 0}, {1, -1}, {1, 1},},
-        {{0, 1}, {0, 2}, {1, 1}, {-1, 1},},
-        {{-1, 0}, {-2, 0}, {-1, -1}, {-1, 1},},
-        {{0, -1}, {0, -2}, {1, -1}, {-1, -1},},
+    int dirdist[4][3][2] {
+        {{1, 0}, {1, -1}, {1, 1},},
+        {{0, 1}, {1, 1}, {-1, 1},},
+        {{-1, 0}, {-1, -1}, {-1, 1},},
+        {{0, -1}, {1, -1}, {-1, -1},},
     };
     void paint_pos(boardloader::Point &p, int dir)
     {
         paint_pos(p.y, p.x);
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 3; i++) {
             int ny = p.y + dirdist[dir][i][0], nx = p.x + dirdist[dir][i][1];
             if (0 <= ny && ny < painted.size() &&
                 0 <= nx && nx < painted[0].size()) paint_pos(ny, nx);
@@ -496,7 +509,12 @@ namespace ikeda
 
     void paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
     {
-        if (filled(block)) return;
+        if (filled(block)) {
+            //cout << "filled!" << endl;
+            return;
+        } else {
+            //cout << "block : " << block.small << " " << block.large << endl;
+        }
         dir_to_right(p, dir);
         bool fl = false;
         if ((block.large.x - block.small.x + 1) > 1) move_right(p, dir);
@@ -548,6 +566,7 @@ namespace ikeda
                 }
             }
             fl = true;
+            //cout << "dir : " << dir << endl;
             dir_to_up(p, dir);
             for (int i = block.small.y; i < block.large.y; i++) {
                 move_up(p, dir);
