@@ -678,7 +678,7 @@ namespace ikeda
             for (int j = 0; j < tate[i].size(); j++) {
                 if (tate[i][j]) {
                     auto tmp = generate_point(tate, yoko, i, j);
-                    if (is_clockwize(tmp)) {
+                    if (!is_clockwize(tmp)) {
                         reverse(tmp.begin(), tmp.end());
                     }
                     ret.push_back(tmp);
