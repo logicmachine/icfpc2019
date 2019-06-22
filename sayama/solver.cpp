@@ -145,7 +145,7 @@ public:
         case ActionType::TurnCounterClockwise:
             return "Q";
         case ActionType::Attatch:
-            return "B" + relative_position.to_string();
+            return "B" + relative_position.to_string_output();
         case ActionType::FastWheels:
             return "F";
         case ActionType::Drill:
