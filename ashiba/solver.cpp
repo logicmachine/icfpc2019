@@ -2,6 +2,7 @@
 #include "unistd.h"
 
 #include "../sayama/board_loader.hpp"
+#include "../ikeda/ikeda.hpp"
 
 using namespace std;
 using boardloader::Cell;
@@ -71,19 +72,19 @@ public:
         speed_       .resize( robot_num );
         y            .resize( robot_num );
         x            .resize( robot_num );
-
+        
         y[0]      = yy;
         x[0]      = xx;
         dir_[0]   = Right;
         speed_[0] = 1;
-
+        
         manipulators_[0].push_back( make_pair( 0, 0 ) );
         for( int i=0; i<DEFAULT_MANIP_NUM; ++i ){
             manipulators_[0].push_back( make_pair( manip_y[i], manip_x[i] ) );
         }
-
+        
         applyPaint( y[0], x[0], manipulators_[0] );
-
+        
         assert( items_.size() == 0 );
         assert( robot_num == 1 );
     }
@@ -286,24 +287,24 @@ public:
             
             applyPaint( y[rb], x[rb], manipulators_[rb] );
             
-            boardloader::print_table( field, y[rb], x[rb] );
-            cout << endl;
+            //boardloader::print_table( field, y[rb], x[rb] );
+            //cout << endl;
             action_log[rb].push_back( act );
         }
         return true;
     }
-
+    
     /*
-    bool isMovable( int dy, int dx ){
-        assert( abs(dy+dx) == 1 and (dy==0 or dx==0) );
-        if( y+dy<0 or y+dy>=H or x+dx<0 or x+dx>=W )return false;
-        
-        if( field[y+dy][x+dx] == boardloader::Obstacle ){
-            return false;
-        }else{
-            return true;
-        }
-    }
+     bool isMovable( int dy, int dx ){
+     assert( abs(dy+dx) == 1 and (dy==0 or dx==0) );
+     if( y+dy<0 or y+dy>=H or x+dx<0 or x+dx>=W )return false;
+     
+     if( field[y+dy][x+dx] == boardloader::Obstacle ){
+     return false;
+     }else{
+     return true;
+     }
+     }
      */
     
     
@@ -361,19 +362,142 @@ void dfs( Worker &robot, vector<vector<bool>>& occupied ){
     }
 }
 
+string getFilename( int n ){
+    stringstream ss;
+    ss << "prob-" << setfill('0') << setw(3) << right << n;
+    return ss.str();
+}
+
+
+
+bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Worker& robot ){
+    if( items_pos.size() == 0 ){
+        warning( "There is no the item" );
+        return false;
+    }
+    if( items_pos.size()>10 ){
+        warning( "To match items" );
+        return false;
+    }else{
+        items_pos.push_back( make_pair( cur_y, cur_x ) );
+        int items_num = items_pos.size()-1;
+
+        vector<vector<int>> dist( items_num+1, vector<int>(items_num+1, 1e9) );
+        for( int i=0; i<items_num+1; ++i ){
+            for( int j=i; j<items_num+1; ++j ){
+                if( i==j ){
+                    dist[i][j] = 0;
+                }else{
+                    dist[i][j] = dist[j][i] = ikeda::calc_distance( robot.field, {items_pos[i].first, items_pos[i].second}, {items_pos[j].first, items_pos[j].second} );
+                }
+            }
+        }
+
+        for( int i=0; i<items_num+1; ++i ){
+            for( int j=i; j<items_num+1; ++j ){
+                assert( dist[i][j] != 1e9 );
+            }
+        }
+
+        vector<vector<int>> dp( items_num, vector<int>(1<<items_num, 1e9) );
+        for( int i=0; i<items_num; ++i ){
+            dp[i][1<<i] = dist[items_num][i];
+        }
+        
+        for( int visit=0; visit<items_num; visit++ ){
+            for( int last=0; last<items_num; ++last ){
+                for( int bit=0; bit<(1<<items_num); ++bit ){
+                    if( (bit & (1<<visit)) )continue;
+                    dp[visit][bit | (1<<visit)] = min( dp[visit][bit | (1<<visit)], dp[last][bit] + dist[last][visit] );
+                }
+            }
+        }
+        
+        
+        vector<pair<int,int>> order;
+        int goal = -1;
+        int val = 1e9;
+        for(int i=0; i<items_num; ++i ){
+            if( dp[i][(1<<items_num)-1]<val ){
+                val = dp[i][(1<<items_num)-1];
+                goal = i;
+            }
+        }
+
+        assert( goal != -1 );
+        order.push_back( items_pos[goal] );
+        int bit_status = ( (1<<items_num)-1 ) - (1<<goal);
+
+        while( order.size()<items_num ){
+            assert( bit_status != 0 );
+            int via = -1;
+            val = 1e9;
+            for( int i=0; i<items_num; ++i ){
+                if( ( bit_status & (1<<i) ) == 0 )continue;
+                if( dp[i][bit_status] < val ){
+                    val = dp[i][bit_status];
+                    via = i;
+                }
+            }
+            assert( via != -1 );
+            bit_status -= (1<<via);
+            order.push_back( items_pos[via] );
+        }
+        assert( bit_status == 0 );
+        
+        order.insert( order.begin(), items_pos.back() );
+        
+        val = 1e9;
+        pair<int,int> nearest_myst = make_pair(-1, -1);
+        for( int i=0; i<robot.field.size(); ++i ){
+            for( int j=0; j<robot.field[0].size(); ++ j){
+                if( robot.field[i][j] == boardloader::Mysterious ){
+                    int res = ikeda::calc_distance( robot.field, {order.back().first, order.back().second}, {i, j} );
+                    if( res<val ){
+                        val = res;
+                        nearest_myst = make_pair( i, j );
+                    }
+                }
+            }
+        }
+        
+        order.push_back( nearest_myst );
+        
+        string move_string = "";
+        for( int i=0; i<order.size()-1; ++i ){
+            cout << order[i].first << " " << order[i].second << "---" << order[i+1].first << " " << order[i+1].second << endl;
+            move_string += ikeda::move( robot.field, {order[i].first, order[i].second}, {order[i+1].first, order[i+1].second} );
+        }
+        
+        for( auto elm: move_string ){
+            assert( robot.doAction( {Action( string(1, elm) )} ) );
+        }
+
+        return true;
+    }
+}
 
 int main(){
     int start_y, start_x;
     string dirname = "/Users/ashibata/GitHub/icfpc2019/problems/";
     
-    for( int i=2; i<=2; ++i ){
-        stringstream ss;
-        ss << "prob-" << setfill('0') << setw(3) << right << i;
-        string filename = ss.str();
-        cout << filename <<endl;
+    for( int i=300; i<=300; ++i ){
+        string filename = getFilename( i );
         
         vector<vector<Cell>> field = load_board( dirname + filename + ".desc", start_y, start_x );
         Worker robot( start_y, start_x, field );
+        
+        vector<pair<int,int>> items_pos;
+        for( int i=0; i<robot.field.size(); ++i ){
+            for( int j=0; j<robot.field[0].size(); ++ j){
+                if( robot.field[i][j] == boardloader::Cloning ){
+                    items_pos.push_back( make_pair(i, j) );
+                }
+            }
+        }
+        
+        assert( correct_items( start_y, start_x, items_pos, robot ) );
+        
         
         vector<vector<bool>> occupied( field.size(), vector<bool>(field[0].size(), false) );
         occupied[robot.y[0]][robot.x[0]] = true;
