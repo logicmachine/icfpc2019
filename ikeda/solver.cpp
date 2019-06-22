@@ -10,6 +10,26 @@ int main(int argc, char *argv[])
     auto board = boardloader::load_board(path, x, y);
     auto blocks = ikeda::largest_rectangle(board);
     //auto graph = ikeda::get_graph(board, ret);
+    
+    /*
+    for (auto i : blocks) {
+        cout << i.small << " " << i.large << endl;
+    }
+    vector<vector<int>> hoge(board.size(), vector<int>(board[0].size(), 0));
+    for (auto i : blocks) {
+        cout << i.small << " " << i.large << endl;
+        for (int j = i.small.y; j <= i.large.y; j++) {
+            for (int k = i.small.x; k <= i.large.x; k++) {
+                hoge[j][k] = 1;
+            }
+        }
+        for (int j = 0; j < hoge.size(); j++) {
+            for (int k = 0; k < hoge[0].size(); k++) {
+                cout << hoge[j][k];
+            }cout << endl;
+        }
+    }
+    */
 
     ikeda::init_board(board.size(), board[0].size());
 
@@ -34,6 +54,7 @@ int main(int argc, char *argv[])
         //cout << tmp << endl;
         ikeda::paint_string(p, dir, tmp);
         //cout << " " << p << " " << blocks[targ].small << endl;
+        //ikeda::debug_print();
         std::cout << tmp;
         ikeda::paint(board, blocks[targ], p, dir);
     }
