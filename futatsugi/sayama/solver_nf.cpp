@@ -166,6 +166,10 @@ private:
     void rotate_clockwise();
     void rotate_counterclockwise();
 
+    bool is_intersect_line_seg(double y1, double x1, double y2, double x2, double y3, double x3, double y4, double x4);
+    bool is_intersect(double y1, double x1, double y2, double x2, double y3, double x3, double y4, double x4);
+    bool is_reachable(int src_y, int src_x, int dst_y, int dst_x);
+
     void wrap();
     bool bfs();
     void dfs(int cy, int cx);
@@ -215,18 +219,61 @@ int Worker::width()
     return table[0].size();
 }
 
+bool Worker::is_intersect_line_seg(double y1, double x1, double y2, double x2, double y3, double x3, double y4, double x4)
+{
+    double ta=(x1-x2)*(y3-y1)+(y1-y2)*(x1-x3);
+    double tb=(x1-x2)*(y4-y1)+(y1-y2)*(x1-x4);
+    if( ta*tb<0 ) return true;
+    else return false;
+}
+
+bool Worker::is_intersect(double y1, double x1, double y2, double x2, double y3, double x3, double y4, double x4)
+{
+    if (is_intersect_line_seg(y1, x1, y2, x2, y3, x3, y4, x4) and is_intersect_line_seg(y3, x3, y4, x4, y1, x1, y2, x2)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool Worker::is_reachable(int src_y, int src_x, int dst_y, int dst_x)
+{
+    int dy[] = {0, 0, 1, 1, 0};
+    int dx[] = {0, 1, 1, 0, 0};
+    for (int i = std::min(src_y, dst_y); i < std::max(src_y, dst_y); i++) {
+        for (int j = std::min(src_x, dst_x); j < std::max(src_x, dst_x); j++) {
+            if (table[i][j] != Cell::Obstacle) continue;
+            for (int k = 0; k < 4; k++) {
+                if (is_intersect(src_y+0.5, src_x+0.5, dst_y+0.5, dst_x+0.5, i+dy[k], j+dx[k], i+dy[k+1], j+dx[k+1])) {
+                    return false;
+                }
+            }
+        }
+    }
+    return true;
+}
+    
 void Worker::wrap()
 {
     // TODO: 当たり判定を入れる
+    int order = 0; /// TODO:
     for (const auto& v : manipulator_list)
     {
         const int ny = y + v.y;
         const int nx = x + v.x;
-        //if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
-        if (is_inside(ny, nx) && (table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied))
+        if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        //if (is_inside(ny, nx) && (table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied))
         {
+            /*
+            if (is_reachable(y, x, ny, nx)) {
+                table[ny][nx] = Cell::Occupied;
+            }
+            */
             table[ny][nx] = Cell::Occupied;
+        } else {
+            if (is_inside(ny, nx) && order > 2 && table[ny][nx] == Cell::Obstacle) break;
         }
+        order++; /// TODO:
     }
 }
 
@@ -261,10 +308,16 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     dy = { 1, 0, -1, 0 };
     dx = { 0, -1, 0, 1 };
 
+    /*
     manipulator_list.emplace_back(0, 0);
     manipulator_list.emplace_back(1, 0);
     manipulator_list.emplace_back(1, 1);
     manipulator_list.emplace_back(1, -1);
+    */
+    manipulator_list.emplace_back(0, 0);
+    manipulator_list.emplace_back(1, 1);
+    manipulator_list.emplace_back(-1, 1);
+    manipulator_list.emplace_back(0, 1);
 }
 
 bool Worker::bfs()
@@ -337,13 +390,24 @@ void Worker::dfs_with_restart()
 
     while (true)
     {
+        if (table[y][x] == Cell::ManipulatorExtension) {
+            int num_manip = manipulator_list.size();
+            manipulator_list.emplace_back(0, num_manip - 2);
+            //action_list.emplace_back(ActionType::Attatch, Point(0, num_manip - 2));
+            action_list.emplace_back(ActionType::Attatch, Point(num_manip - 2, 0));
+        }
+
         table[y][x] = Cell::Occupied;
 
+#if 0
         if (x+1 < table[0].size()) {
             if (table[y][x+1] == Cell::Empty) table[y][x+1] = Cell::Occupied;
             if (y+1 < table.size() && table[y+1][x+1] == Cell::Empty) table[y+1][x+1] = Cell::Occupied;
             if (y-1 >= 0 && table[y-1][x+1] == Cell::Empty) table[y-1][x+1] = Cell::Occupied;
         }
+#else
+        wrap();
+#endif
 
         selected.clear();
 
