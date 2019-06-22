@@ -573,5 +573,251 @@ namespace ikeda
             }
         }
     }
+
+    int dx_grid[4] = {0, -1, 0, -1}, dy_grid[4] = {0, 0, -1, -1};
+    set<pair<int, int>> get_points(vector<string> &data)
+    {
+        set<pair<int, int>> ret;
+        for (int i = 0; i < data.size()+1; i++) {
+            for (int j = 0; j < data[0].size()+1; j++) {
+                int sp = 0;
+                for (int k = 0; k < 4; k++) {
+                    int ny = i + dy_grid[k], nx = j + dx_grid[k];
+                    if (0 <= ny && ny < data.size() &&
+                            0 <= nx && nx < data.size() && 
+                            data[ny][nx] == '.') {
+                        sp++;
+                    }
+                }
+                if (sp != 4 && sp != 0) {
+                    ret.insert({i, j});
+                }
+            }
+        }
+        return ret;
+    }
+
+    pair<int, int> next(pair<int, int> pos, pair<int, int> bef, set<pair<int, int>> &data)
+    {
+        for (int i = 0; i < 4; i++) {
+            int ny = pos.first + dxy[i], nx = pos.second + dxy[i+1];
+            if (bef.first == ny && bef.second == nx) continue;
+            if (data.find({ny, nx}) != data.end()) {
+                return {ny, nx};
+            }
+        }
+        cout << "error : did not find next point" << endl;
+        return {-100, -100};
+    }
+
+    vector<pair<int, int>> unite_point(set<pair<int, int>> &data)
+    {
+        vector<pair<int, int>> ret;
+        pair<int, int> pos = *data.begin();
+        pair<int, int> st = pos, bef(-5, -5);
+        do {
+            cout << "p:" << pos.first << " " << pos.second << " b:" <<
+                bef.first << " " << bef.second << endl;
+            auto tmp = next(pos, bef, data);
+            bef = pos;
+            pos = tmp;
+            data.erase(pos);
+            ret.push_back(pos);
+        } while (pos != st);
+        data.erase(st);
+        return ret;
+    }
+
+    vector<vector<pair<int, int>>> unite_points(set<pair<int, int>> &data)
+    {
+        vector<vector<pair<int, int>>> ret;
+        while (!data.empty()) {
+            auto tmp = unite_point(data);
+            ret.push_back(tmp);
+        }
+        return ret;
+    }
+
+    vector<pair<int, int>> unique_point(vector<pair<int, int>> &data)
+    {
+        vector<pair<int, int>> ret;
+        cout << "solve :";
+        for (int i = 0; i < data.size(); i++) {
+            cout << " ( " << data[i].first << " , " << data[i].second << ") ";
+        } cout << endl;
+        int st = 0;
+        for (int i = 1; i < data.size(); i++) {
+            if (data[i].first < data[st].first) st = i;
+            else if (data[i].first == data[st].first &&
+                    data[i].second < data[st].second) st = i;
+        }
+
+        ret.push_back(data[st]);
+        for (int adder = 1; adder < data.size(); adder++) {
+            int p = (st + adder) % data.size(), bef = (st + adder -1) % data.size(),
+                nxt = (st + adder + 1) % data.size();
+            if (data[bef].first == data[p].first && data[p].first == data[nxt].first) continue;
+            if (data[bef].second == data[p].second && data[p].second == data[nxt].second) continue;
+            ret.push_back(data[p]);
+        }
+        for (int i = 0; i < ret.size(); i++) {
+            cout << " ( " << ret[i].first << " , " << ret[i].second << ") ";
+        } cout << endl;
+        return ret;
+    }
+
+    vector<vector<pair<int, int>>> unique_points(vector<vector<pair<int, int>>> &data)
+    {
+        vector<vector<pair<int, int>>> ret;
+        for (int i = 0; i < data.size(); i++) {
+            auto tmp = unique_point(data[i]);
+            /*
+            if (is_clockwize(tmp)) {
+                reverse(tmp.begin(), tmp.end());
+            }
+            */
+            ret.push_back(tmp);
+        }
+        return ret;
+    }
+
+    void get_edge(vector<string> &data, vector<vector<int>> &tate, vector<vector<int>> &yoko)
+    {
+        for (int i = 0; i < data.size(); i++) {
+            cout << data[i] << endl;
+        }
+
+        for (int i = 0; i < data.size(); i++) {
+            for (int j = 0; j < data[i].size()+1; j++) {
+                int lp = 0, rp = 0;
+                if (!j || data[i][j-1] == '#') lp = 1;
+                if (j == data[0].size() || data[i][j] == '#') rp = 1;
+                if (lp != rp) tate[i][j] = 1;
+            }
+        }
+        for (int i = 0; i < tate.size(); i++) {
+            for (int j = 0; j < tate[i].size(); j++) {
+                cout << tate[i][j];
+            } cout << endl;
+        }
+        for (int i = 0; i < data.size()+1; i++) {
+            for (int j = 0; j < data[0].size(); j++) {
+                int lp = 0, rp = 0;
+                if (!i || data[i-1][j] == '#') lp = 1;
+                if (i == data.size() || data[i][j] == '#') rp = 1;
+                if (lp != rp) yoko[i][j] = 1;
+            }
+        }
+        for (int i = 0; i < yoko.size(); i++) {
+            for (int j = 0; j < yoko[i].size(); j++) {
+                cout << yoko[i][j];
+            } cout << endl;
+        }
+    }
+
+    int yokoy[4] = {0, 0, 1, 1}, yokox[4] = {0, -1, 0, -1},
+        tatey[4] = {-1, 0, -1, 0}, tatex[4] = {0, 0, 1, 1};
+    vector<pair<int, int>> generate_point(vector<vector<int>> &tate, vector<vector<int>> &yoko, int y, int x)
+    {
+        vector<pair<int, int>> ret;
+        int sty = y, stx = x, by = -5, bx = -5;
+        bool tateyoko = true;
+        do {
+            cout << "pos : " << y << " " << x << " " << (tateyoko ? "tate" : "yoko") << endl;
+            if (tateyoko) {
+                if (by != y+1 && 0 <= y+1 && y+1 < tate.size() && tate[y+1][x]) {
+                    tate[y+1][x] = 0;
+                    by = y;
+                    y++;
+                } else if (by != y-1 && 0 <= y-1 && y-1 < tate.size() && tate[y-1][x]) {
+                    tate[y-1][x] = 0;
+                    by = y;
+                    y--;
+                } else {
+                    for (int i = 0; i < 4; i++) {
+                        int ny = y + yokoy[i], nx = x + yokox[i];
+                        if (by == ny && bx == nx) continue;
+                        if (0 <= ny && ny < yoko.size() && 
+                                0 <= nx && nx < yoko[0].size() &&
+                                yoko[ny][nx]) {
+                            cout << "yoko : " << y << " " << x << " " << i << endl;
+                            ret.push_back({y+i/2, x});
+                            yoko[ny][nx] = 0;
+                            y = ny; x = nx;
+                            tateyoko = !tateyoko;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                if (bx != x+1 && 0 <= x+1 && x+1 < yoko.size() && yoko[y][x+1]) {
+                    yoko[y][x+1] = 0;
+                    bx = x;
+                    x++;
+                } else if (bx != x-1 && 0 <= x-1 && x-1 < yoko.size() && yoko[y][x-1]) {
+                    yoko[y][x-1] = 0;
+                    bx = x;
+                    x--;
+                } else {
+                    for (int i = 0; i < 4; i++) {
+                        int ny = y + tatey[i], nx = x + tatex[i];
+                        if (by == ny && bx == nx) continue;
+                        if (0 <= ny && ny < tate.size() && 
+                                0 <= nx && nx < tate[0].size() &&
+                                tate[ny][nx]) {
+                            cout << "tate : " << y << " " << x << " " << i << endl;
+                            ret.push_back({y, x+i/2});
+                            tate[ny][nx] = 0;
+                            by = y; bx = x;
+                            y = ny; x = nx;
+                            tateyoko = !tateyoko;
+                            break;
+                        }
+                    }
+                }
+            }
+        } while (sty != y || stx != x || !tateyoko);
+        tate[sty][stx] = 0;
+        return ret;
+    }
+
+    vector<vector<pair<int, int>>> generate_points(vector<vector<int>> &tate, vector<vector<int>> &yoko)
+    {
+        vector<vector<pair<int, int>>> ret;
+        for (int i = 0; i < tate.size(); i++) {
+            for (int j = 0; j < tate[i].size(); j++) {
+                if (tate[i][j]) {
+                    ret.push_back(generate_point(tate, yoko, i, j));
+                    cout << "owa" << endl;
+        for (int i = 0; i < tate.size(); i++) {
+            for (int j = 0; j < tate[i].size(); j++) {
+                cout << tate[i][j];
+            } cout << endl;
+        }
+        for (int i = 0; i < yoko.size(); i++) {
+            for (int j = 0; j < yoko[i].size(); j++) {
+                cout << yoko[i][j];
+            } cout << endl;
+        }
+                }
+            }
+        }
+        return ret;
+    }
+
+    vector<vector<pair<int, int>>> get_tenretsu(vector<string> &data)
+    {
+        vector<vector<int>> tate(data.size(), vector<int>(data[0].size()+1, 0)), 
+            yoko(data.size()+1, vector<int>(data[0].size(), 0));
+        get_edge(data, tate, yoko);
+        //auto points = generate_points(tate, yoko);
+        return generate_points(tate, yoko);
+        /*
+        auto points = get_points(data);
+        auto pointss = unite_points(points);
+        pointss = unique_points(pointss);
+        */
+    }
+
 }
 
