@@ -13,7 +13,7 @@ int main(int argc, char *argv[])
 
     vector<int> used(blocks.size(), 0);
     boardloader::Point p(x, y);
-    int dir = 3; // 0123 -> hjkl
+    int dir = 1; // 0123 -> urdl
 
     for (int _ = 0; _ < blocks.size(); _++) {
         int score = 1010001000, targ = -1;
@@ -28,10 +28,11 @@ int main(int argc, char *argv[])
         }
         used[targ] = 1;
         auto tmp = ikeda::move(board, p, blocks[targ].small);
-        std::cout << tmp << std::endl;
+        std::cout << tmp;
         p = blocks[targ].small;
         ikeda::paint(board, blocks[targ], p, dir);
     }
+    cout << endl;
     
     return 0;
 }

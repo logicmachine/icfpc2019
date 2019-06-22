@@ -265,7 +265,7 @@ namespace ikeda
         return graph;
     }
 
-    char cmdchar[4] = {'R', 'D', 'L', 'U'};
+    string cmdchar[4] = {"A", "W", "D", "S"};
     string move(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
     {
         vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
@@ -288,7 +288,7 @@ namespace ikeda
                 }
             }
         }
-        vector<string> cmd;
+        string cmd;
         auto p = to;
         while (p != from) {
             for (int i = 0; i < 4; i++) {
@@ -296,7 +296,7 @@ namespace ikeda
                 if (0 <= nx && nx < board.size() &&
                         0 <= ny && ny < board[nx].size() &&
                         cost[nx][ny] == cost[p.y][p.x]-1) {
-                    cmd.push_back(cmdchar(i));
+                    cmd += cmdchar[i];
                     p = boardloader::Point(nx, ny);
                     break;
                 }
@@ -306,5 +306,106 @@ namespace ikeda
         return cmd;
     }
 
+    void dir_to_right(int &dir)
+    {
+        while (dir != 1) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+    }
+
+    void dir_to_down(int &dir)
+    {
+        while (dir != 2) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+    }
+
+    void dir_to_up(int &dir)
+    {
+        while (dir != 0) {
+            dir = (dir+1) % 4;
+            cout << "E";
+        }
+    }
+
+    void move_right(boardloader::Point &p)
+    {
+        cout << "D";
+        p.x++;
+    }
+
+    void move_down(boardloader::Point &p)
+    {
+        cout << "S";
+        p.y--;
+    }
+
+    void move_up(boardloader::Point &p)
+    {
+        cout << "W";
+        p.y++;
+    }
+
+    void paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
+    {
+        dir_to_right(dir);
+        bool fl = false;
+        if ((block.large.x - block.small.x + 1) > 1) move_right(p);
+        for (int j = 0; j < (block.large.x - block.small.x + 1) / 6; j++) {
+            fl = true;
+            if (j) {
+                move_right(p);
+                move_right(p);
+                move_right(p);
+            }
+            dir_to_down(dir);
+            for (int i = block.small.y; i <= block.large.y; i++) {
+                move_up(p);
+            }
+            dir_to_right(dir);
+            move_right(p);
+            move_right(p);
+            move_right(p);
+            dir_to_up(dir);
+            for (int i = block.small.y; i <= block.large.y; i++) {
+                move_down(p);
+            }
+            dir_to_right(dir);
+        }
+        if ((block.large.x - block.small.x + 1) % 6 >= 4) {
+            if (fl) {
+                move_right(p);
+                move_right(p);
+                move_right(p);
+            }
+            fl = true;
+            dir_to_down(dir);
+            for (int i = block.small.y; i <= block.large.y; i++) {
+                move_up(p);
+            }
+            dir_to_right(dir);
+            for (int i = 0; i < (block.large.x - block.small.x + 1) % 3; i++) {
+                move_right(p);
+            }
+            dir_to_up(dir);
+            for (int i = block.small.y; i <= block.large.y; i++) {
+                move_down(p);
+            }
+            dir_to_right(dir);
+        } else if ((block.large.x - block.small.x + 1) % 6 >= 1) {
+            if (fl) {
+                for (int i = 0; i < (block.large.x - block.small.x + 1) % 3 + 1; i++) {
+                    move_right(p);
+                }
+            }
+            fl = true;
+            dir_to_down(dir);
+            for (int i = block.small.y; i <= block.large.y; i++) {
+                move_up(p);
+            }
+        }
+    }
 }
 
