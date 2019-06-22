@@ -160,6 +160,10 @@ public:
     Worker(Table<Cell>& table, int y, int x);
     std::vector<Action> solve();
 
+    Worker(Worker& src);
+
+    Worker clone();
+
 private:
     void rotate_clockwise();
     void rotate_counterclockwise();
@@ -199,6 +203,39 @@ private:
     std::array<int, 4> dx;
     std::array<int, 4> dy;
 };
+
+Worker::Worker(Worker& src)
+{
+    // table
+    table.resize(src.table.size());
+    for (auto& row : table)
+    {
+        row.resize(src.width());
+    }
+    for (int i = 0; i < height(); i++)
+    {
+        for (int j = 0; j < width(); j++)
+        {
+            table[i][j] = src.table[i][j];
+        }
+    }
+
+    y = src.y;
+    x = src.x;
+
+    for (auto v : src.manipulator_list)
+    {
+        manipulator_list.push_back(v);
+    }
+
+    // action list doesn't have to share
+
+    for (int i = 0; i < 4; i++)
+    {
+        dy[i] = src.dy[i];
+        dx[i] = src.dx[i];
+    }
+}
 
 bool Worker::is_empty(int cy, int cx)
 {
@@ -385,7 +422,7 @@ bool Worker::reset_to_small_region()
             const int ny = my + dy[i];
             const int nx = mx + dx[i];
 
-            constexpr int upperbound = 100;
+            constexpr int upperbound = 50;
 
             if (is_inside(ny, nx) && is_empty(ny, nx) && get_empty_connected_cell(ny, nx, upperbound) < upperbound)
             {
@@ -462,6 +499,28 @@ std::vector<Action> Worker::solve()
 
     return action_list;
 }
+
+class Solver
+{
+public:
+    Solver(Table<Cell> table, int start_y, int start_x);
+
+    std::vector<Action> solve();
+
+private:
+    Worker worker;
+};
+
+Solver::Solver(Table<Cell> table, int start_y, int start_x)
+    : worker(table, start_y, start_x)
+{
+}
+
+std::vector<Action> Solver::solve()
+{
+    return worker.solve();
+}
+
 } // namespace xyzworker
 
 void save_action(const std::vector<xyzworker::Action>& action_list, const std::string& filepath)
@@ -490,9 +549,9 @@ int main(int argc, char* argv[])
     int start_y, start_x;
     auto board = load_board(input_filepath, start_y, start_x);
 
-    xyzworker::Worker worker(board, start_y, start_x);
+    xyzworker::Solver solver(board, start_y, start_x);
 
-    auto result = worker.solve();
+    auto result = solver.solve();
 
     save_action(result, output_filepath);
 }
