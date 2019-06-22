@@ -41,15 +41,19 @@ def run_validation(problem_path, solution_path):
         else:
             return {'success': False, 'message': status}
 
+@app.route('/verify', methods=['POST'])
 @app.route('/verify/<int:problem_id>', methods=['POST'])
-def verify(problem_id):
+def verify(problem_id=None):
     conn = get_db()
     c = conn.cursor()
-    query = 'select content from problems where id=?'
-    row = c.execute(query, (problem_id,)).fetchone()
-    if row is None:
-        abort(404)
-    problem  = row[0]
+    if problem_id is None:
+        problem = request.form['problem']
+    else:
+        query = 'select content from problems where id=?'
+        row = c.execute(query, (problem_id,)).fetchone()
+        if row is None:
+            abort(404)
+        problem = row[0]
     solution = request.form['solution']
     with NamedTemporaryFile() as pf, NamedTemporaryFile() as sf:
         pf.write(problem.encode('utf-8'))

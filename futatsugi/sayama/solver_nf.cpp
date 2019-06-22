@@ -1,10 +1,14 @@
-#include "board_loader.hpp"
+//#include "board_loader.hpp"
 
-//#include "../ccl.hpp"
+#include "bits/stdc++.h"
 
 #include <algorithm>
 #include <queue>
 #include <stack>
+
+#include "../ccl.hpp"
+#include "../../ikeda/ikeda.hpp"
+//#include "ikeda.hpp"
 
 using boardloader::Cell;
 using boardloader::load_board;
@@ -177,6 +181,12 @@ private:
 
     void move(Direction dir);
 
+    Direction get_move_direction(char a);
+    void pickup_manipulators();
+    void get_ccl_data(const std::vector<std::vector<Cell>>& table, std::vector<int>& data, int& W);
+    void calc_ccl(std::vector<int>& data, const int W, std::vector<int>& result, vector<int>& spaces);
+    void check_ccl(const std::vector<std::vector<Cell>>& table, vector<int>& result, vector<int>& spaces);
+
     bool is_inside(int cy, int cx);
 
     int get_empty_neighrbor_cell(int cy, int cx);
@@ -194,6 +204,10 @@ private:
 
     std::array<int, 4> dx;
     std::array<int, 4> dy;
+
+	nf_ccl::CCL ccl;
+    std::vector<int> ccl_data;
+    std::vector<int> ccl_spaces;
 };
 
 void Worker::move(Direction dir)
@@ -299,6 +313,49 @@ void Worker::rotate_counterclockwise()
     }
 }
 
+void Worker::get_ccl_data(const std::vector<std::vector<Cell>>& table, std::vector<int>& data, int& W)
+{
+    W = table[0].size();
+    //vector<int> data;
+    for (const auto& xs : table) {
+        for (const auto& x : xs) {
+            data.push_back(x == Cell::Obstacle ? 1 : 0);
+        }
+    }
+}
+
+void Worker::calc_ccl(std::vector<int>& data, const int W, std::vector<int>& result, vector<int>& spaces)
+{
+	//std::vector<int> result(ccl.ccl(data, W));
+    result = ccl.ccl(data, W);
+
+	std::cerr << "Size: " << result.size() << std::endl; /// number of pixels
+	std::cerr << "Width: " << W << std::endl; /// width
+    //std::vector<int> memo;
+	for (int i = 0; i < static_cast<int>(result.size()) / W; i++) {
+		for (int j = 0; j < W; j++) {
+            if (data[i*W+j] == 0 && find(spaces.begin(), spaces.end(), result[i*W+j]) == spaces.end()) {
+                spaces.push_back(result[i*W+j]);
+            }
+        }
+	}
+    for (auto space : spaces) {
+        std::cerr << space << " ";
+    }
+    std::cerr << std::endl;
+}
+
+//void Worker::check_ccl(const std::vector<std::vector<Cell>>& table, std::vector<int>& data, int& W, vector<int>& result, vector<int>& spaces)
+void Worker::check_ccl(const std::vector<std::vector<Cell>>& table, vector<int>& result, vector<int>& spaces)
+{
+    int W;
+    vector<int> data;
+    result.clear();
+    spaces.clear();
+    get_ccl_data(table, data, W);
+    calc_ccl(data, W, result, spaces);
+}
+
 Worker::Worker(Table<Cell>& table, int y, int x)
     : table(table)
     , y(y)
@@ -318,6 +375,42 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(1, 1);
     manipulator_list.emplace_back(-1, 1);
     manipulator_list.emplace_back(0, 1);
+
+    /// CCL
+    //int W;
+    //vector<int> data;
+    /*
+    int W = table[0].size();
+    vector<int> data;
+    for (const auto& xs : table) {
+        for (const auto& x : xs) {
+            data.push_back(x == Cell::Obstacle ? 1 : 0);
+        }
+    }
+    */
+    //std::vector<int> result;
+    //std::vector<int> spaces;
+    check_ccl(table, ccl_data, ccl_spaces);
+    //get_ccl_data(table, data, W);
+    //calc_ccl(data, W, result, spaces);
+
+    /*
+	std::vector<int> result(ccl.ccl(data, W));
+
+	std::cerr << "Size: " << result.size() << std::endl; /// number of pixels
+	std::cerr << "Width: " << W << std::endl; /// width
+    std::vector<int> memo;
+	for (int i = 0; i < static_cast<int>(result.size()) / W; i++) {
+		for (int j = 0; j < W; j++) {
+            if (data[i*W+j] == 0 && find(memo.begin(), memo.end(), result[i*W+j]) == memo.end()) {
+                memo.push_back(result[i*W+j]);
+            }
+        }
+	}
+    for (auto x : memo) {
+        std::cerr << x << std::endl;
+    }
+    */
 }
 
 bool Worker::bfs()
@@ -394,7 +487,7 @@ void Worker::dfs_with_restart()
             int num_manip = manipulator_list.size();
             manipulator_list.emplace_back(0, num_manip - 2);
             //action_list.emplace_back(ActionType::Attatch, Point(0, num_manip - 2));
-            action_list.emplace_back(ActionType::Attatch, Point(num_manip - 2, 0));
+            action_list.emplace_back(ActionType::Attatch, Point(num_manip - 2, 0)); /// TODO:
         }
 
         table[y][x] = Cell::Occupied;
@@ -455,8 +548,67 @@ void Worker::dfs(int cy, int cx)
     }
 }
 
+Direction Worker::get_move_direction(char a)
+{
+    switch (a) {
+        case 'W':
+            return Direction::Up;
+        case 'S':
+            return Direction::Down;
+        case 'A':
+            return Direction::Left;
+        case 'D':
+            return Direction::Right;
+        default:
+            break;
+    }
+    return Direction::None;
+}
+
+void Worker::pickup_manipulators()
+{
+    std::vector<Point> manip_pos_list;
+    for (int yy = 0; yy < table.size(); yy++) {
+        for (int xx = 0; xx < table[0].size(); xx++) {
+            if (table[yy][xx] == Cell::ManipulatorExtension) {
+                manip_pos_list.push_back(Point(yy, xx));
+            }
+        }
+    }
+    
+    ///std::cerr << manip_pos_list.size() << std::endl; ///// debug
+    
+    //int res = ikeda::calc_distance( robot.field, {order.back().first, order.back().second}, {i, j} );
+    int cur_x = x;
+    int cur_y = y;
+    std::string move_string("");
+    while (!manip_pos_list.empty()) {
+        Point shortest_pos;
+        unsigned int shortest_length = -1U;
+        for (auto pos : manip_pos_list) {
+            int res = ikeda::calc_distance(table, {cur_y, cur_x}, {pos.y, pos.x});
+            if (shortest_length > res) {
+                shortest_length = res;
+                shortest_pos = pos;
+            }
+        }
+        ///std::cerr << shortest_length << std::endl; ////// debug
+        move_string += ikeda::move(table, {cur_y, cur_x}, {shortest_pos.y, shortest_pos.x});
+        cur_y = shortest_pos.y;
+        cur_x = shortest_pos.x;
+        manip_pos_list.erase(std::remove(manip_pos_list.begin(), manip_pos_list.end(), shortest_pos), manip_pos_list.end());
+    }
+
+    for (char a : move_string) {
+        wrap();
+        move(get_move_direction(a));
+    }
+}
+
 std::vector<Action> Worker::solve()
 {
+    pickup_manipulators();
+
     dfs_with_restart();
     // dfs(y, x);
 
@@ -482,10 +634,19 @@ void save_action(const std::vector<xyzworker::Action>& action_list, const std::s
     fout.close();
 }
 
+void output_action(const std::vector<xyzworker::Action>& action_list)
+{
+    for (auto action : action_list)
+    {
+        std::cout << action.to_string();
+    }
+    std::cout << std::endl;
+}
+
 int main(int argc, char* argv[])
 {
     std::string input_filepath(argv[1]);
-    std::string output_filepath(argv[2]);
+    //std::string output_filepath(argv[2]);
 
     int start_y, start_x;
     auto board = load_board(input_filepath, start_y, start_x);
@@ -494,5 +655,6 @@ int main(int argc, char* argv[])
 
     auto result = worker.solve();
 
-    save_action(result, output_filepath);
+    //save_action(result, output_filepath);
+    output_action(result);
 }
