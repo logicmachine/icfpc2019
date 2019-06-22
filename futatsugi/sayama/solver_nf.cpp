@@ -222,7 +222,8 @@ void Worker::wrap()
     {
         const int ny = y + v.y;
         const int nx = x + v.x;
-        if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        //if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        if (is_inside(ny, nx) && (table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied))
         {
             table[ny][nx] = Cell::Occupied;
         }
@@ -280,7 +281,8 @@ bool Worker::bfs()
         Point p = que.front();
         que.pop();
 
-        if (table[p.y][p.x] == Cell::Empty)
+        //if (table[p.y][p.x] == Cell::Empty)
+        if (table[p.y][p.x] != Cell::Obstacle && table[p.y][p.x] != Cell::Occupied)
         {
             std::vector<Direction> move_list;
             while (p.y != y || p.x != x)
@@ -378,7 +380,8 @@ void Worker::dfs(int cy, int cx)
     {
         const int ny = cy + dy[i];
         const int nx = cx + dx[i];
-        if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        //if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+        if (is_inside(ny, nx) && (table[ny][nx] != Cell::Obstacle && table[ny][nx] != Cell::Occupied))
         {
             const Direction dir = static_cast<Direction>(i);
             move(dir);
