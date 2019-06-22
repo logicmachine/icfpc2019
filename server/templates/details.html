@@ -24,38 +24,27 @@
     </nav>
 
     <main role="main" class="container">
-      <h2>Best solutions</h2>
+      <h2>Problem #{{ problem.problem_id }}</h2>
       <table class="table table-hover">
         <thead>
           <tr>
-            <th scope="col">#</th>
-            <th scope="col">Description</th>
+            <th scope="col">ID</th>
             <th scope="col">Score</th>
             <th scope="col">Author</th>
             <th scope="col">When</th>
           </tr>
         </thead>
         <tbody>
-          {% for problem in problems %}
-            <tr class="table-row clickable-table-row" data-href="/details/{{ problem.problem_id }}">
-              <td scope="row" class="text-right">{{ problem.problem_id }}</td>
-              <td>{{ problem.description }}</td>
-              <td class="text-right">{{ problem.score }}</td>
-              <td>{{ problem.author }}</td>
-              <td>{{ problem.created_at }}</td>
+          {% for submission in submissions %}
+            <tr class="table-row clickable-table-row" data-href="/download/{{ submission.id }}">
+              <td scope="row" class="text-right">{{ submission.id }}</td>
+              <td class="text-right">{{ submission.score }}</td>
+              <td>{{ submission.author }}</td>
+              <td>{{ submission.created_at }}</td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
-
-      <h2>How to submit</h2>
-      <ul>
-        <li><a href="/submit">Submit form</a></li>
-        <li>from shell: <code>curl -X POST -d 'problem_id=[id]&amp;author=[name]&amp;solution=[text]' http://icfpc.logicmachine.jp:5000/submit</code></li>
-      </ul>
-
-      <h2>Download</h2>
-      <p><a class="btn btn-primary" href="/make-zip" role="button">Make submission archive</a></p>
     </main>
 
     <script
