@@ -18,7 +18,8 @@ enum Item{
     B,
     F,  //Fast
     L,  //Drill
-    X,
+    R,
+    C,
 };
 
 enum Direction{
@@ -37,11 +38,12 @@ class Action{
 public:
     string opcode;
     pair<int,int> operand;
-    string additional;
+    int user_num;
     
+    Action(){ opcode = ""; operand = make_pair( -1, -1 ); user_num = -1; } 
     Action( string opc ): opcode(opc) { operand = make_pair( -1, -1 ); }
     Action( string opc, pair<int,int> oper ): opcode(opc), operand(oper) {}
-    Action( string opc, pair<int,int> oper, string addit ): opcode(opc), operand(oper), additional(addit) {}
+    Action( string opc, int num ): opcode(opc), user_num(num) { operand = make_pair( -1, -1 ); }
     
 };
 
@@ -52,11 +54,10 @@ class Worker{
     vector<Direction> dir_;
     vector<int> speed_;
     
-    map<Item,int> items_;
-    int robot_num;
-    
+    map<Item,int> items_;    
     
 public:
+    int robot_num;
     vector<int> y, x;
     vector<vector<Cell>> field;
     
@@ -147,8 +148,9 @@ public:
     bool doAction( vector<Action> act_list ){
         assert( act_list.size() <= robot_num );
         
-        for( int rb=0; rb<robot_num; ++rb ){
+        for( int rb=0; rb<act_list.size(); ++rb ){
             Action act = act_list[rb];
+            cout << act.opcode << endl;
             
             if( act.opcode == "W" ){ // move_up
                 if( y[rb]+1 >= H or field[y[rb]+1][x[rb]]==boardloader::Obstacle ){
@@ -163,7 +165,8 @@ public:
                         if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                         if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                         if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        if( field[moved_y][moved_x] == boardloader::Teleport             ) items_[ R ]++;
+                        if( field[moved_y][moved_x] == boardloader::Cloning              ) items_[ C ]++;
                         
                         applyPaint( moved_y, moved_x, manipulators_[rb] );
                         
@@ -187,7 +190,9 @@ public:
                         if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                         if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                         if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        if( field[moved_y][moved_x] == boardloader::Teleport             ) items_[ R ]++;
+                        if( field[moved_y][moved_x] == boardloader::Cloning              ) items_[ C ]++;
+
                         
                         applyPaint( moved_y, moved_x, manipulators_[rb] );
                         
@@ -211,7 +216,9 @@ public:
                         if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                         if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                         if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        if( field[moved_y][moved_x] == boardloader::Teleport             ) items_[ R ]++;
+                        if( field[moved_y][moved_x] == boardloader::Cloning              ) items_[ C ]++;
+
                         
                         applyPaint( moved_y, moved_x, manipulators_[rb] );
                         
@@ -235,7 +242,9 @@ public:
                         if( field[moved_y][moved_x] == boardloader::ManipulatorExtension ) items_[ B ]++;
                         if( field[moved_y][moved_x] == boardloader::FastWheels           ) items_[ F ]++;
                         if( field[moved_y][moved_x] == boardloader::Drill                ) items_[ L ]++;
-                        if( field[moved_y][moved_x] == boardloader::Mysterious           ) items_[ X ]++;
+                        if( field[moved_y][moved_x] == boardloader::Teleport             ) items_[ R ]++;
+                        if( field[moved_y][moved_x] == boardloader::Cloning              ) items_[ C ]++;
+
                         
                         applyPaint( moved_y, moved_x, manipulators_[rb] );
                         
@@ -277,8 +286,23 @@ public:
                 return false;
                 
             }else if( act.opcode == "C" ){ // attach Fast
-                warning( "Not implemented" );
-                return false;
+                if( act.user_num<0 or act.user_num>=robot_num ){
+                    warning( "Invalid user_name" + to_string(act.user_num) );
+                    return false;
+                }
+                if( not hasItem( C ) ){
+                    return false;
+                }
+                robot_num++;
+                assert( items_[C]>0 );
+                items_[C]--;
+
+                action_log   .push_back( vector<Action>() );
+                manipulators_.push_back( manipulators_[ act.user_num ] );
+                dir_         .push_back( dir_[act.user_num] );
+                speed_       .push_back( speed_[act.user_num] );
+                y            .push_back( y[act.user_num] ); 
+                x            .push_back( x[act.user_num] );
                 
             }else{
                 error( "The action " + act.opcode + " is not defined" );
@@ -286,7 +310,7 @@ public:
             }
             
             applyPaint( y[rb], x[rb], manipulators_[rb] );
-            
+
             //boardloader::print_table( field, y[rb], x[rb] );
             //cout << endl;
             action_log[rb].push_back( act );
@@ -375,8 +399,8 @@ bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Work
         warning( "There is no the item" );
         return false;
     }
-    if( items_pos.size()>10 ){
-        warning( "To match items" );
+    if( items_pos.size()>15 ){
+        warning( "To match items" + to_string(items_pos.size()) );
         return false;
     }else{
         items_pos.push_back( make_pair( cur_y, cur_x ) );
@@ -447,6 +471,7 @@ bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Work
         
         order.insert( order.begin(), items_pos.back() );
         
+        
         val = 1e9;
         pair<int,int> nearest_myst = make_pair(-1, -1);
         for( int i=0; i<robot.field.size(); ++i ){
@@ -460,6 +485,7 @@ bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Work
                 }
             }
         }
+        if( val == 1e9 )return false;
         
         order.push_back( nearest_myst );
         
@@ -477,11 +503,12 @@ bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Work
     }
 }
 
+
 int main(){
     int start_y, start_x;
     string dirname = "/Users/ashibata/GitHub/icfpc2019/problems/";
     
-    for( int i=300; i<=300; ++i ){
+    for( int i=3; i<=3; ++i ){
         string filename = getFilename( i );
         
         vector<vector<Cell>> field = load_board( dirname + filename + ".desc", start_y, start_x );
@@ -497,8 +524,24 @@ int main(){
         }
         
         assert( correct_items( start_y, start_x, items_pos, robot ) );
-        
-        
+        while( robot.hasItem( C ) ){
+            int items_num = robot.countItem( C );
+
+            vector<Action> clone_actions;
+            int idle_robot_num = robot.robot_num;
+
+            for(int i=0; i<idle_robot_num; ++i ){
+                if( items_num>0 ){
+                    clone_actions.push_back( Action( "C", i ) );
+                    items_num--;
+                }else{
+                    break;
+                }
+            }
+            assert( robot.doAction( clone_actions ) );
+            cout << string(10,'-') << endl;
+        }
+
         vector<vector<bool>> occupied( field.size(), vector<bool>(field[0].size(), false) );
         occupied[robot.y[0]][robot.x[0]] = true;
         dfs( robot, occupied );
