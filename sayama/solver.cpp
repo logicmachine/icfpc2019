@@ -1,5 +1,9 @@
 #include "board_loader.hpp"
 
+#include <algorithm>
+#include <queue>
+#include <stack>
+
 using boardloader::Cell;
 using boardloader::load_board;
 using boardloader::Point;
@@ -161,7 +165,9 @@ private:
     void rotate_counterclockwise();
 
     void wrap();
+    bool bfs();
     void dfs(int cy, int cx);
+    void dfs_with_restart();
 
     void move(Direction dir);
 
@@ -256,6 +262,83 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(1, -1);
 }
 
+bool Worker::bfs()
+{
+    Table<Direction> recur(height(), std::vector<Direction>(width(), Direction::None));
+    // 何でも良い
+    recur[y][x] = Direction::Left;
+
+    std::queue<Point> que;
+    que.emplace(y, x);
+
+    while (!que.empty())
+    {
+        Point p = que.front();
+        que.pop();
+
+        if (table[p.y][p.x] == Cell::Empty)
+        {
+            std::vector<Direction> move_list;
+            while (p.y != y || p.x != x)
+            {
+                const Direction inv_dir = recur[p.y][p.x];
+                const int index = static_cast<int>(inv_dir);
+                p.y += dy[index];
+                p.x += dx[index];
+                move_list.push_back(inverse(inv_dir));
+            }
+            std::reverse(move_list.begin(), move_list.end());
+            for (auto m : move_list)
+            {
+                move(m);
+            }
+            return true;
+        }
+
+        for (int i = 0; i < 4; i++)
+        {
+            const int ny = p.y + dy[i];
+            const int nx = p.x + dx[i];
+
+            if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && recur[ny][nx] == Direction::None)
+            {
+                que.emplace(ny, nx);
+                recur[ny][nx] = inverse(static_cast<Direction>(i));
+            }
+        }
+    }
+    return false;
+}
+
+void Worker::dfs_with_restart()
+{
+    while (true)
+    {
+        table[y][x] = Cell::Occupied;
+
+        bool selected = false;
+        for (int i = 0; i < 4; i++)
+        {
+            const int ny = y + dy[i];
+            const int nx = x + dx[i];
+            if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
+            {
+                const Direction dir = static_cast<Direction>(i);
+                move(dir);
+                selected = true;
+                break;
+            }
+        }
+        if (!selected)
+        {
+            if (!bfs())
+            {
+                break;
+            }
+        }
+    }
+}
+
 void Worker::dfs(int cy, int cx)
 {
     table[cy][cx] = Cell::Occupied;
@@ -276,7 +359,8 @@ void Worker::dfs(int cy, int cx)
 
 std::vector<Action> Worker::solve()
 {
-    dfs(y, x);
+    dfs_with_restart();
+    // dfs(y, x);
 
     return action_list;
 }
