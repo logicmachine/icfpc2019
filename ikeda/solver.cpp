@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
         cin >> board[i];
     }
     vector<vector<pair<int, int>>> ret = ikeda::get_tenretsu(board);
-    //auto ret = ikeda::unite_points(data);
+
     cout << ret.size() << endl;
     for (vector<pair<int, int>> i : ret) {
         cout << "points : " << endl;

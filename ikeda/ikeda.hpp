@@ -684,21 +684,12 @@ namespace ikeda
     void get_edge(vector<string> &data, vector<vector<int>> &tate, vector<vector<int>> &yoko)
     {
         for (int i = 0; i < data.size(); i++) {
-            cout << data[i] << endl;
-        }
-
-        for (int i = 0; i < data.size(); i++) {
             for (int j = 0; j < data[i].size()+1; j++) {
                 int lp = 0, rp = 0;
                 if (!j || data[i][j-1] == '#') lp = 1;
                 if (j == data[0].size() || data[i][j] == '#') rp = 1;
                 if (lp != rp) tate[i][j] = 1;
             }
-        }
-        for (int i = 0; i < tate.size(); i++) {
-            for (int j = 0; j < tate[i].size(); j++) {
-                cout << tate[i][j];
-            } cout << endl;
         }
         for (int i = 0; i < data.size()+1; i++) {
             for (int j = 0; j < data[0].size(); j++) {
@@ -707,11 +698,6 @@ namespace ikeda
                 if (i == data.size() || data[i][j] == '#') rp = 1;
                 if (lp != rp) yoko[i][j] = 1;
             }
-        }
-        for (int i = 0; i < yoko.size(); i++) {
-            for (int j = 0; j < yoko[i].size(); j++) {
-                cout << yoko[i][j];
-            } cout << endl;
         }
     }
 
@@ -723,7 +709,6 @@ namespace ikeda
         int sty = y, stx = x, by = -5, bx = -5;
         bool tateyoko = true;
         do {
-            cout << "pos : " << y << " " << x << " " << (tateyoko ? "tate" : "yoko") << endl;
             if (tateyoko) {
                 if (by != y+1 && 0 <= y+1 && y+1 < tate.size() && tate[y+1][x]) {
                     tate[y+1][x] = 0;
@@ -740,7 +725,6 @@ namespace ikeda
                         if (0 <= ny && ny < yoko.size() && 
                                 0 <= nx && nx < yoko[0].size() &&
                                 yoko[ny][nx]) {
-                            cout << "yoko : " << y << " " << x << " " << i << endl;
                             ret.push_back({y+i/2, x});
                             yoko[ny][nx] = 0;
                             by = y; bx = x;
@@ -766,7 +750,6 @@ namespace ikeda
                         if (0 <= ny && ny < tate.size() && 
                                 0 <= nx && nx < tate[0].size() &&
                                 tate[ny][nx]) {
-                            cout << "tate : " << y << " " << x << " " << i << endl;
                             ret.push_back({y, x+i/2});
                             tate[ny][nx] = 0;
                             by = y; bx = x;
@@ -782,24 +765,30 @@ namespace ikeda
         return ret;
     }
 
+    inline double cross(const pair<int, int> &a, const pair<int, int> &b){
+        return a.first * b.second - a.second * b.first;
+    }
+
+    bool is_clockwize(vector<pair<int, int>> &data)
+    {
+		double s = 0.0;
+		for(int i = 0; i < data.size(); ++i){
+			s += cross(data[i], data[(i + 1) % data.size()]);
+		}
+		return s <= 0.0;
+    }
+
     vector<vector<pair<int, int>>> generate_points(vector<vector<int>> &tate, vector<vector<int>> &yoko)
     {
         vector<vector<pair<int, int>>> ret;
         for (int i = 0; i < tate.size(); i++) {
             for (int j = 0; j < tate[i].size(); j++) {
                 if (tate[i][j]) {
-                    ret.push_back(generate_point(tate, yoko, i, j));
-                    cout << "owa" << endl;
-        for (int i = 0; i < tate.size(); i++) {
-            for (int j = 0; j < tate[i].size(); j++) {
-                cout << tate[i][j];
-            } cout << endl;
-        }
-        for (int i = 0; i < yoko.size(); i++) {
-            for (int j = 0; j < yoko[i].size(); j++) {
-                cout << yoko[i][j];
-            } cout << endl;
-        }
+                    auto tmp = generate_point(tate, yoko, i, j);
+                    if (is_clockwize(tmp)) {
+                        reverse(tmp.begin(), tmp.end());
+                    }
+                    ret.push_back(tmp);
                 }
             }
         }
