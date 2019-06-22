@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <queue>
+#include <random>
 #include <stack>
 #include <tuple>
 
@@ -18,7 +19,27 @@ class Cluster
 {
 public:
     Table<int> clustering_by_bfs(Table<Cell>& board, std::vector<Point>& point_list);
+    std::vector<int> cluster_count_by_bfs(Table<Cell>& board, std::vector<Point>& point_list);
 };
+
+std::vector<int> Cluster::cluster_count_by_bfs(Table<Cell>& board, std::vector<Point>& point_list)
+{
+    auto table = clustering_by_bfs(board, point_list);
+
+    std::vector<int> result(point_list.size(), 0);
+
+    for (int i = 0; i < board.size(); i++)
+    {
+        for (int j = 0; j < board[i].size(); j++)
+        {
+            if (board[i][j] != Cell::Obstacle)
+            {
+                result[table[i][j]]++;
+            }
+        }
+    }
+    return result;
+}
 
 Table<int> Cluster::clustering_by_bfs(Table<Cell>& board, std::vector<Point>& point_list)
 {
@@ -298,6 +319,9 @@ public:
     std::vector<Point> gather(Cell cell);
 
     template <typename FUNCTION>
+    std::vector<Point> gather_with(FUNCTION condition);
+
+    template <typename FUNCTION>
     bool bfs_move(FUNCTION condition);
 
     template <typename FUNCTION>
@@ -322,9 +346,6 @@ private:
     void rotate_counterclockwise();
 
     void wrap();
-
-    template <typename FUNCTION>
-    std::vector<Point> gather_internal(FUNCTION condition);
 
     void dfs(int cy, int cx);
 
@@ -436,11 +457,11 @@ Table<Cell>& Worker::get_table()
 
 std::vector<Point> Worker::gather(Cell cell)
 {
-    return gather_internal<>([&](int y, int x) { return table[y][x] == cell; });
+    return gather_with<>([&](int y, int x) { return table[y][x] == cell; });
 }
 
 template <typename FUNCTION>
-std::vector<Point> Worker::gather_internal(FUNCTION condition)
+std::vector<Point> Worker::gather_with(FUNCTION condition)
 {
     std::vector<Point> ret;
 
@@ -825,10 +846,54 @@ public:
 
     void fill_obstacle(const Table<int>& cluster, Table<Cell>& table, int id);
 
+    std::vector<Point> generate_base_point_list(Worker& worker, int number_cluster);
+
 private:
     std::vector<Worker> worker_list;
     Cluster cluster;
 };
+
+std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_count)
+{
+    auto& table = worker.get_table();
+
+    std::vector<Point> candidate;
+    for (int i = 0; i < table.size(); i++)
+    {
+        for (int j = 0; j < table[0].size(); j++)
+        {
+            if (table[i][j] != Cell::Obstacle)
+            {
+                candidate.emplace_back(i, j);
+            }
+        }
+    }
+    std::mt19937_64 mt;
+
+    std::shuffle(candidate.begin(), candidate.end(), mt);
+    std::uniform_int_distribution<int> rand(0, candidate.size() - 1);
+
+    std::vector<Point> best_input(cluster_count);
+    int best_eval = std::numeric_limits<int>::max();
+
+    std::vector<Point> input(cluster_count);
+
+    for (int i = 0; i < 3000; i++)
+    {
+        for (int j = 0; j < cluster_count; j++)
+        {
+            input[j] = candidate[rand(mt)];
+        }
+        auto clusters = cluster.cluster_count_by_bfs(table, input);
+        const int eval = *std::max_element(clusters.begin(), clusters.end()) - *std::min_element(clusters.begin(), clusters.end());
+        if (best_eval > eval)
+        {
+            best_eval = eval;
+            std::copy(input.begin(), input.end(), best_input.begin());
+        }
+    }
+    return best_input;
+}
 
 void Solver::fill_obstacle(const Table<int>& cluster, Table<Cell>& table, int id)
 {
@@ -886,18 +951,18 @@ std::vector<std::vector<Action>> Solver::solve()
         }
         worker_list[0].collect_optimal(target_list);
 
+        const int num_clone = clone_point.size();
+
         // Clone
+        worker_size = num_clone + 1;
 
         std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
 
-        const int num_clone = std::max(0, std::min<int>(clone_point.size(), mysterious_point.size() - 1));
-
-        clone_point.resize(num_clone);
-        mysterious_point.resize(num_clone + 1);
-
         // Clustering の結果を収集
 
-        Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), mysterious_point);
+        std::vector<Point> base_point_list = generate_base_point_list(worker_list[0], num_clone + 1);
+
+        Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), base_point_list);
 
         const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
         worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
@@ -907,15 +972,14 @@ std::vector<std::vector<Action>> Solver::solve()
             worker_list[i].copy_from(worker_list[0]);
             worker_list[0].clone_command();
 
-            worker_list[i].bfs_move([&](Point& p) { return p == mysterious_point[i]; });
+            worker_list[i].bfs_move([&](Point& p) { return p == base_point_list[i]; });
             fill_obstacle(clustering_result, worker_list[i].get_table(), i);
             worker_list[i].dfs_with_restart();
         }
 
-        worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[0]; });
+        worker_list[0].bfs_move([&](Point& p) { return p == base_point_list[0]; });
         fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
         worker_list[0].dfs_with_restart();
-        worker_size = num_clone + 1;
     }
 
     std::vector<std::vector<Action>> ret;
