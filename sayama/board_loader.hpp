@@ -23,6 +23,8 @@ enum Cell
     FastWheels = 'F',
     Drill = 'L',
     Mysterious = 'X',
+    Teleport = 'R',
+    Cloning = 'C',
 };
 
 Cell to_cell(const char ch)
@@ -37,6 +39,10 @@ Cell to_cell(const char ch)
         return Cell::Drill;
     case 'X':
         return Cell::Mysterious;
+    case 'R':
+        return Cell::Teleport;
+    case 'C':
+        return Cell::Cloning;
     }
     assert(false);
 }
@@ -141,6 +147,8 @@ struct Point
     {
         return !(*this == p);
     }
+
+    std::string to_string();
 };
 
 Point get_direction(const Point& from, const Point& to)
@@ -153,8 +161,15 @@ Point get_direction(const Point& from, const Point& to)
 
 std::ostream& operator<<(std::ostream& out, const Point& p)
 {
-    out << "(" << p.y << ", " << p.x << ")";
+    out << "(" << p.y << "," << p.x << ")";
     return out;
+}
+
+std::string Point::to_string()
+{
+    std::stringstream ss;
+    ss << *this;
+    return ss.str();
 }
 
 std::string read_all(const std::string& filepath)
