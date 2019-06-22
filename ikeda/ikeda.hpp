@@ -126,6 +126,24 @@ namespace ikeda
         return ret;
     }
 
+    vector<Block> largest_rectangle(vector<string> &board)
+    {
+        vector<vector<int>> state(board.size(), vector<int>(board[0].size(), 0));
+        for (int i = 0; i < board.size(); i++) {
+            for (int j = 0; j < board[i].size(); j++) {
+                state[i][j] = (board[i][j] != '#'); // 空マスが 1 
+            }
+        }
+        vector<Block> ret;
+        auto block = _largest_rectangle(state);
+        while (block.size) {
+            ret.emplace_back(block);
+            fill_state(state, block);
+            block = _largest_rectangle(state);
+        }
+        return ret;
+    }
+
     int dxy[5] = {0, 1, 0, -1, 0};
     int calc_distance(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
     {
@@ -143,6 +161,31 @@ namespace ikeda
                 if (0 <= nx && nx < board.size() &&
                         0 <= ny && ny < board[nx].size() &&
                         board[nx][ny] != boardloader::Cell::Obstacle && 
+                        cost[nx][ny] > cs+1) {
+                    cost[nx][ny] = cs+1;
+                    que.push_back({cs+1, boardloader::Point(nx, ny)});
+                }
+            }
+        }
+        return cost[to.y][to.x];
+    }
+
+    int calc_distance(vector<string> &board, boardloader::Point &from, boardloader::Point &to)
+    {
+        vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
+        cost[from.y][from.x] = 0;
+        deque<pair<int, boardloader::Point>> que;
+        que.push_back({0, from});
+        while (!que.empty()) {
+            auto pos = que.front().second;
+            auto cs = que.front().first;
+            que.pop_front();
+            if (cs != cost[pos.y][pos.x]) continue;
+            for (int i = 0; i < 4; i++) {
+                int nx = pos.y + dxy[i], ny = pos.x + dxy[i+1];
+                if (0 <= nx && nx < board.size() &&
+                        0 <= ny && ny < board[nx].size() &&
+                        board[nx][ny] != '#' && 
                         cost[nx][ny] > cs+1) {
                     cost[nx][ny] = cs+1;
                     que.push_back({cs+1, boardloader::Point(nx, ny)});
@@ -187,6 +230,81 @@ namespace ikeda
         return graph;
     }
 
+    vector<vector<int>> get_graph(vector<string> &board, vector<Block> &blocks)
+    {
+        vector<vector<int>> graph(blocks.size(), vector<int>(blocks.size(), 0));
+        for (int i = 0; i < blocks.size(); i++) {
+            for (int j = i+1; j < blocks.size(); j++) {
+                auto check = [&](Block &a, Block &b) {
+                    bool ret = false;
+                    ret |= (abs(a.small.y - b.small.y) == 1);
+                    ret |= (abs(a.small.y - b.small.x) == 1);
+                    ret |= (abs(a.small.y - b.large.y) == 1);
+                    ret |= (abs(a.small.y - b.large.x) == 1);
+                    ret |= (abs(a.small.x - b.small.y) == 1);
+                    ret |= (abs(a.small.x - b.small.x) == 1);
+                    ret |= (abs(a.small.x - b.large.y) == 1);
+                    ret |= (abs(a.small.x - b.large.x) == 1);
+                    ret |= (abs(a.large.y - b.small.y) == 1);
+                    ret |= (abs(a.large.y - b.small.x) == 1);
+                    ret |= (abs(a.large.y - b.large.y) == 1);
+                    ret |= (abs(a.large.y - b.large.x) == 1);
+                    ret |= (abs(a.large.x - b.small.y) == 1);
+                    ret |= (abs(a.large.x - b.small.x) == 1);
+                    ret |= (abs(a.large.x - b.large.y) == 1);
+                    ret |= (abs(a.large.x - b.large.x) == 1);
+                    return ret;
+                };
+                if (check(blocks[i], blocks[j])) {
+                    int tmp = calc_distance(board, blocks[i].small, blocks[j].small);
+                    graph[i][j] = tmp;
+                    graph[j][i] = tmp;
+                }
+            }
+        }
+        return graph;
+    }
+
+    char cmdchar[4] = {'R', 'D', 'L', 'U'};
+    string move(vector<vector<boardloader::Cell>> &board, boardloader::Point &from, boardloader::Point &to)
+    {
+        vector<vector<int>> cost(board.size(), vector<int>(board[0].size(), 1010001000));
+        cost[from.y][from.x] = 0;
+        deque<pair<int, boardloader::Point>> que;
+        que.push_back({0, from});
+        while (!que.empty()) {
+            auto pos = que.front().second;
+            auto cs = que.front().first;
+            que.pop_front();
+            if (cs != cost[pos.y][pos.x]) continue;
+            for (int i = 0; i < 4; i++) {
+                int nx = pos.y + dxy[i], ny = pos.x + dxy[i+1];
+                if (0 <= nx && nx < board.size() &&
+                        0 <= ny && ny < board[nx].size() &&
+                        board[nx][ny] != boardloader::Cell::Obstacle && 
+                        cost[nx][ny] > cs+1) {
+                    cost[nx][ny] = cs+1;
+                    que.push_back({cs+1, boardloader::Point(nx, ny)});
+                }
+            }
+        }
+        vector<string> cmd;
+        auto p = to;
+        while (p != from) {
+            for (int i = 0; i < 4; i++) {
+                int nx = p.y + dxy[i], ny = p.x + dxy[i+1];
+                if (0 <= nx && nx < board.size() &&
+                        0 <= ny && ny < board[nx].size() &&
+                        cost[nx][ny] == cost[p.y][p.x]-1) {
+                    cmd.push_back(cmdchar(i));
+                    p = boardloader::Point(nx, ny);
+                    break;
+                }
+            }
+        }
+        reverse(cmd.begin(), cmd.end());
+        return cmd;
+    }
 
 }
 

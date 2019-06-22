@@ -2,21 +2,37 @@
 
 #include "./ikeda.hpp"
 
+
 int main(int argc, char *argv[]) 
 {
-    if (argc != 2) return 1;
     string path(argv[1]);
     int x, y;
     auto board = boardloader::load_board(path, x, y);
-    auto ret = ikeda::largest_rectangle(board);
-    cout << "fin" << endl;
-    auto graph = ikeda::get_graph(board, ret);
-    for (int i = 0; i < graph.size(); i++) {
-        for (int j = 0; j < graph[i].size(); j++) {
-            cout << graph[i][j] << " ";
+    auto blocks = ikeda::largest_rectangle(board);
+    //auto graph = ikeda::get_graph(board, ret);
+
+    vector<int> used(blocks.size(), 0);
+    boardloader::Point p(x, y);
+    int dir = 3; // 0123 -> hjkl
+
+    for (int _ = 0; _ < blocks.size(); _++) {
+        int score = 1010001000, targ = -1;
+        for (int i = 0; i < used.size(); i++) {
+            if (!used[i]) {
+                int tmp = ikeda::calc_distance(board, p, blocks[i].small);
+                if (score > tmp) {
+                    score = tmp;
+                    targ = i;
+                }
+            }
         }
-        cout << endl;
+        used[targ] = 1;
+        auto tmp = ikeda::move(board, p, blocks[targ].small);
+        std::cout << tmp << std::endl;
+        p = blocks[targ].small;
+        ikeda::paint(board, blocks[targ], p, dir);
     }
+    
     return 0;
 }
 
