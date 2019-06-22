@@ -173,6 +173,8 @@ private:
 
     bool is_inside(int cy, int cx);
 
+    int get_empty_neighrbor_cell(int cy, int cx);
+
     Table<Cell> table;
     int y;
     int x;
@@ -310,13 +312,30 @@ bool Worker::bfs()
     return false;
 }
 
+int Worker::get_empty_neighrbor_cell(int cy, int cx)
+{
+    int count = 0;
+    for (int i = 0; i < 4; i++)
+    {
+        const int ny = cy + dy[i];
+        const int nx = cx + dx[i];
+        if (is_inside(ny, nx) && table[ny][nx] != Cell::Occupied && table[ny][nx] != Cell::Obstacle)
+        {
+            count++;
+        }
+    }
+    return count;
+}
+
 void Worker::dfs_with_restart()
 {
+    std::vector<std::pair<int, Direction>> selected;
+
     while (true)
     {
         table[y][x] = Cell::Occupied;
+        selected.clear();
 
-        bool selected = false;
         for (int i = 0; i < 4; i++)
         {
             const int ny = y + dy[i];
@@ -324,17 +343,20 @@ void Worker::dfs_with_restart()
             if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
             {
                 const Direction dir = static_cast<Direction>(i);
-                move(dir);
-                selected = true;
-                break;
+                selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
             }
         }
-        if (!selected)
+        if (selected.empty())
         {
             if (!bfs())
             {
                 break;
             }
+        }
+        else
+        {
+            sort(selected.begin(), selected.end());
+            move(selected[0].second);
         }
     }
 }
