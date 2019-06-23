@@ -444,7 +444,7 @@ void Worker::init(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(-1, 1);
     manipulator_list.emplace_back(0, 1);
 
-    wrap();
+    // wrap();
 }
 
 std::vector<Action>& Worker::get_action_list()

@@ -576,6 +576,10 @@ Point Worker::largest_cc(int y, int x)
 
 void Worker::dfs_with_restart()
 {
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
+    std::uniform_real_distribution<> dist(0.0, 1.0);
+
     std::vector<std::pair<int, Direction>> selected;
 
     while (true)
@@ -616,7 +620,8 @@ void Worker::dfs_with_restart()
         }
         if (selected.empty())
         {
-#if 1
+//#if 1
+            if (dist(engine) < 0.3) {
             check_ccl(table, ccl_data, ccl_spaces); ////// debug
             Point next_pos(nearest_cc(y, x));
             //Point next_pos(largest_cc(y, x));
@@ -627,12 +632,14 @@ void Worker::dfs_with_restart()
                 move(get_move_direction(a));
                 wrap();
             }
-#else
+            } else {
+//#else
             if (!bfs())
             {
                 break;
             }
-#endif
+//#endif
+            }
         }
         else
         {
@@ -765,7 +772,7 @@ int main(int argc, char* argv[])
     int start_y, start_x;
     auto board = load_board(input_filepath, start_y, start_x);
 
-    for (int i = 0; i < 10; i++) {
+    //for (int i = 0; i < 10; i++) {
     xyzworker::Worker worker(board, start_y, start_x);
 
     auto result = worker.solve();
@@ -774,5 +781,5 @@ int main(int argc, char* argv[])
     
     //save_action(result, output_filepath);
     output_action(result);
-    }
+    //}
 }
