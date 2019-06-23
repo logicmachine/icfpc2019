@@ -55,12 +55,15 @@ def main():
     with open('task.sol', 'w') as f:
         f.write(best_solution)
 
-    # cwd = os.path.join(solution_root, 'puzzle')
-    # proc = subprocess.Popen(['./run.sh', puzzle_file], cwd=cwd, stdout=subprocess.PIPE)
-    # outs, errs = proc.communicate()
-    # solution = outs.decode('utf-8')
-    # with open('puzzle.desc', 'w') as f:
-    #     f.write(solution)
+    print('------------------------------')
+    print(' ', 'ikeda (puzzle)')
+    print('------------------------------')
+    cwd = os.path.join(solution_root, 'ikeda')
+    proc = subprocess.Popen(['./run.sh', puzzle_file], cwd=cwd, stdout=subprocess.PIPE)
+    outs, errs = proc.communicate()
+    solution = outs.decode('utf-8')
+    with open('puzzle.desc', 'w') as f:
+        f.write(solution)
 
     with open('block_id', 'w') as f:
         f.write(str(current_block))
