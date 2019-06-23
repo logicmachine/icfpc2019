@@ -162,6 +162,27 @@ enum class Direction
     None,
 };
 
+bool is_orthogonal(const Direction dir1, const Direction dir2)
+{
+    return (static_cast<int>(dir1) % 2) != (static_cast<int>(dir2) % 2);
+}
+
+Point to_point(const Direction direction)
+{
+    switch (direction)
+    {
+    case Direction::Up:
+        return Point(1, 0);
+    case Direction::Left:
+        return Point(0, -1);
+    case Direction::Down:
+        return Point(-1, 0);
+    case Direction::Right:
+        return Point(0, 1);
+    }
+    assert(false);
+}
+
 std::string direction_to_string(const Direction dir)
 {
     switch (dir)
@@ -353,13 +374,22 @@ private:
 
     bool is_inside(int cy, int cx);
 
+    bool should_rotate_clockwise(Direction dir, int length);
+
+    int count_pass_empty(const Point& base, Direction move_dir, int move_length, Direction side_dir, int side_length);
+
     int get_empty_neighrbor_cell(int cy, int cx);
 
     int get_empty_connected_cell(int cy, int cx, int upperbound);
 
+    void generate_move_sequence(const std::vector<Direction>& move_list);
+
+    Table<bool> occupied;
     Table<Cell> table;
     int y;
     int x;
+
+    Direction player_direction;
 
     int height() const;
     int width() const;
@@ -435,6 +465,12 @@ void Worker::init(Table<Cell>& table, int y, int x)
         }
     }
 
+    occupied.resize(height());
+    for (auto& row : occupied)
+    {
+        row.resize(width(), false);
+    }
+
     // Up, Left, Down, Right
     dy = { 1, 0, -1, 0 };
     dx = { 0, -1, 0, 1 };
@@ -444,7 +480,9 @@ void Worker::init(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(-1, 1);
     manipulator_list.emplace_back(0, 1);
 
-    // wrap();
+    wrap();
+
+    player_direction = Direction::Right;
 }
 
 std::vector<Action>& Worker::get_action_list()
@@ -488,21 +526,29 @@ void Worker::copy_from(const Worker& src)
     {
         row.resize(src.width());
     }
+
+    occupied.resize(height());
+    for (auto& row : occupied)
+    {
+        row.resize(width(), false);
+    }
+
     for (int i = 0; i < height(); i++)
     {
         for (int j = 0; j < width(); j++)
         {
             table[i][j] = src.table[i][j];
+            occupied[i][j] = src.occupied[i][j];
         }
     }
 
     y = src.y;
     x = src.x;
 
-    for (int i = 0; i < 4; i++)
-    {
-        manipulator_list.push_back(src.manipulator_list[i]);
-    }
+    manipulator_list.emplace_back(0, 0);
+    manipulator_list.emplace_back(1, 1);
+    manipulator_list.emplace_back(-1, 1);
+    manipulator_list.emplace_back(0, 1);
 
     // action list doesn't have to share
 
@@ -511,6 +557,7 @@ void Worker::copy_from(const Worker& src)
         dy[i] = src.dy[i];
         dx[i] = src.dx[i];
     }
+    player_direction = Direction::Right;
 }
 
 Worker::Worker(const Worker& src)
@@ -527,7 +574,7 @@ Worker::Worker()
 
 bool Worker::is_empty(int cy, int cx)
 {
-    return table[cy][cx] != Cell::Obstacle && table[cy][cx] != Cell::Occupied;
+    return table[cy][cx] != Cell::Obstacle && !occupied[cy][cx];
 }
 
 void Worker::attach_command()
@@ -552,7 +599,8 @@ void Worker::move(Direction dir)
     y += dy[index];
     x += dx[index];
     action_list.emplace_back(ActionType::Move, dir);
-    // wrap();
+
+    wrap();
 }
 
 bool Worker::is_inside(int cy, int cx)
@@ -587,7 +635,7 @@ void Worker::wrap()
             }
             else if (table[ny][nx] != Cell::Obstacle)
             {
-                table[ny][nx] = Cell::Occupied;
+                occupied[ny][nx] = true;
             }
         }
     }
@@ -595,6 +643,7 @@ void Worker::wrap()
 
 void Worker::rotate_clockwise()
 {
+    player_direction = clockwise(player_direction);
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -602,10 +651,12 @@ void Worker::rotate_clockwise()
         p.y = -px;
         p.x = py;
     }
+    action_list.emplace_back(ActionType::TurnClockwise);
 }
 
 void Worker::rotate_counterclockwise()
 {
+    player_direction = counter_clockwise(player_direction);
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -613,6 +664,7 @@ void Worker::rotate_counterclockwise()
         p.y = px;
         p.x = -py;
     }
+    action_list.emplace_back(ActionType::TurnCounterClockwise);
 }
 
 Worker::Worker(Table<Cell>& table, int y, int x)
@@ -656,6 +708,87 @@ int Worker::shortest_distance_to(const Point& start, FUNCTION condition)
     return 100000;
 }
 
+int Worker::count_pass_empty(const Point& base, Direction move_dir, int move_length, Direction side_dir, int side_length)
+{
+    int count = 0;
+
+    Point dm = to_point(move_dir);
+    Point ds = to_point(side_dir);
+
+    Point cur(base);
+
+    for (int i = 0; i < move_length; i++)
+    {
+        Point cur2(cur);
+        for (int j = 0; j < side_length; j++)
+        {
+            if (is_inside(cur2.y, cur2.x) && is_empty(cur2.y, cur2.x))
+            {
+                count++;
+            }
+            else if (table[y][x] == Cell::Obstacle)
+            {
+                break;
+            }
+            cur2 += ds;
+        }
+        cur += dm;
+    }
+    return count;
+}
+
+bool Worker::should_rotate_clockwise(Direction move_dir, int move_length)
+{
+    Point current(y, x);
+    const int side_length = manipulator_list.size() - 3;
+
+    const int eval_clockwise = count_pass_empty(current, move_dir, move_length, clockwise(player_direction), side_length);
+    const int eval_counterclockwise = count_pass_empty(current, move_dir, move_length, counter_clockwise(player_direction), side_length);
+
+    return eval_clockwise > eval_counterclockwise;
+}
+
+void Worker::generate_move_sequence(const std::vector<Direction>& move_list)
+{
+    int index = 0;
+    while (index < move_list.size())
+    {
+        int begin = index;
+        while (index < move_list.size() && move_list[begin] == move_list[index])
+        {
+            index++;
+        }
+        if (index - begin > 2)
+        {
+            if (manipulator_list.size() > 4)
+            {
+                if (!is_orthogonal(player_direction, move_list[begin]))
+                {
+                    if (should_rotate_clockwise(move_list[begin], index - begin))
+                    {
+                        rotate_clockwise();
+                    }
+                    else
+                    {
+                        rotate_counterclockwise();
+                    }
+                }
+            }
+            else
+            {
+                if (is_orthogonal(player_direction, move_list[begin]))
+                {
+                    rotate_counterclockwise();
+                }
+            }
+        }
+        for (int i = begin; i < index; i++)
+        {
+            move(move_list[i]);
+        }
+    }
+}
+
 template <typename FUNCTION>
 bool Worker::bfs_move(FUNCTION condition)
 {
@@ -683,10 +816,7 @@ bool Worker::bfs_move(FUNCTION condition)
                 move_list.push_back(inverse(inv_dir));
             }
             std::reverse(move_list.begin(), move_list.end());
-            for (auto m : move_list)
-            {
-                move(m);
-            }
+            generate_move_sequence(move_list);
             return true;
         }
 
@@ -781,8 +911,6 @@ void Worker::dfs_with_restart()
 
     while (true)
     {
-        wrap();
-
         if (!reset_to_small_region())
         {
             selected.clear();
@@ -815,7 +943,7 @@ void Worker::dfs_with_restart()
 
 void Worker::dfs(int cy, int cx)
 {
-    table[cy][cx] = Cell::Occupied;
+    occupied[cy][cx] = true;
 
     for (int i = 0; i < 4; i++)
     {
