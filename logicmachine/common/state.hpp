@@ -86,6 +86,11 @@ public:
 			s.m_wrappers[wrapper_id] = wrapper;
 			s.m_boosters = boosters;
 		}
+		std::unordered_set<Vec2> affected_cells() const {
+			std::unordered_set<Vec2> cells(wrapped);
+			for(const auto& p : replaces){ cells.insert(p.first); }
+			return cells;
+		}
 	};
 
 private:
@@ -108,8 +113,8 @@ private:
 				for(int x = min_x; accept && x <= max_x; ++x){
 					if(m_field(y, x) != CellKind::OBSTACLE){ continue; }
 					const std::array<Vec2, 4> cs = {
-						Vec2(y + 0, x + 0) * 2,  Vec2(y + 0, x + 1) * 2,
-						Vec2(y + 1, x + 0) * 2,  Vec2(y + 1, x + 1) * 2
+						Vec2(x + 0, y + 0) * 2,  Vec2(x + 0, y + 1) * 2,
+						Vec2(x + 1, y + 0) * 2,  Vec2(x + 1, y + 1) * 2
 					};
 					int acc_ccw = 0;
 					for(const auto& c : cs){

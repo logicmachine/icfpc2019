@@ -40,7 +40,7 @@ inline std::ostream& operator<<(std::ostream& os, const Command& c){
 	switch(c.kind){
 	case CommandKind::MOVE:       os << "DWAS"[c.args[0]]; break;
 	case CommandKind::ROTATE:     os << "E Q"[c.args[0] + 1]; break;
-	case CommandKind::EX_MANIP:   os << "B"; break;
+	case CommandKind::EX_MANIP:   os << "B(" << c.args[1] << "," << c.args[0] << ")"; break;
 	case CommandKind::FAST_WHEEL: os << "F"; break;
 	case CommandKind::DRILL:      os << "L"; break;
 	case CommandKind::TELE_RESET: os << "R"; break;
