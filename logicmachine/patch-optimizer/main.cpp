@@ -86,6 +86,11 @@ int main(int argc, char *argv[]){
 	std::istringstream description_iss(description);
 	auto state = State::parse_initial_state(description_iss);
 
+	if(argc >= 4){
+		std::ifstream ifs(argv[3]);
+		state.initialize_boosters(ifs);
+	}
+
 	std::vector<std::vector<Command>> optimized_solution;
 	for(size_t wid = 0; wid < solution.size(); ++wid){
 		auto sequence = solution[wid];
