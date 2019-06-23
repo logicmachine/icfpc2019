@@ -3,6 +3,7 @@
 #include <unordered_map>
 #include <queue>
 #include <cassert>
+#include <cstdlib>
 
 #include "../common/description_parser.hpp"
 #include "../common/command.hpp"
@@ -12,10 +13,14 @@
 
 static const int SOURCE_LENGTH = 7;
 
+inline int manhattan_distance(const Vec2& a, const Vec2& b){
+	return abs(a.x - b.x) + abs(a.y - b.y);
+}
 
 bool optimize(
 	std::vector<Command>& seq,
 	int depth,
+	size_t wid,
 	const Vec2& final_position,
 	int final_rotation,
 	const std::unordered_map<Vec2, CellKind>& affections,
@@ -24,7 +29,7 @@ bool optimize(
 {
 	if(depth == 0){
 		if((final_rotation & 3) != (cur_rotation & 3)){ return false; }
-		if(state.wrappers(0).position != final_position){ return false; }
+		if(state.wrappers(wid).position != final_position){ return false; }
 		for(const auto& a : affections){
 			const auto& p = a.first;
 			if(!state.wrapped(p.y, p.x)){ return false; }
@@ -35,11 +40,11 @@ bool optimize(
 	bool accept = false;
 	// move
 	for(int d = 0; !accept && d < 4; ++d){
-		const auto ub = state.move_wrapper(0, d);
+		const auto ub = state.move_wrapper(wid, d);
 		if(!ub){ continue; }
 		seq.emplace_back(CommandKind::MOVE, d);
 		accept = optimize(
-			seq, depth - 1,
+			seq, depth - 1, wid,
 			final_position, final_rotation, affections,
 			cur_rotation, state);
 		if(!accept){ seq.pop_back(); }
@@ -47,11 +52,11 @@ bool optimize(
 	}
 	// rotate
 	for(int d = -1; !accept && d <= 1; d += 2){
-		const auto ub = state.rotate_wrapper(0, d);
+		const auto ub = state.rotate_wrapper(wid, d);
 		if(!ub){ continue; }
 		seq.emplace_back(CommandKind::ROTATE, d);
 		accept = optimize(
-			seq, depth - 1,
+			seq, depth - 1, wid,
 			final_position, final_rotation, affections,
 			cur_rotation + d, state);
 		if(!accept){ seq.pop_back(); }
@@ -63,19 +68,27 @@ bool optimize(
 
 int main(int argc, char *argv[]){
 	if(argc < 3){
-		std::cerr << "Usage: " << argv[0] << " description solution" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " description solution [boosters]" << std::endl;
 		return 0;
 	}
 
 	const auto description = parse_task_description(read_file(argv[1]));
 	const auto solution = parse_command_sequence(read_file(argv[2]));
-	assert(solution.size() == 1);  // TODO support cloning
+	// TODO cloning from wrapper[1-]
+	for(size_t i = 1; i < solution.size(); ++i){
+		bool has_cloning = false;
+		for(const auto& c : solution[i]){
+			if(c.kind == CommandKind::CLONE){ has_cloning = true; }
+		}
+		assert(!has_cloning);
+	}
 
 	std::istringstream description_iss(description);
 	auto state = State::parse_initial_state(description_iss);
 
 	std::vector<std::vector<Command>> optimized_solution;
-	for(auto sequence : solution){
+	for(size_t wid = 0; wid < solution.size(); ++wid){
+		auto sequence = solution[wid];
 		for(size_t head = 0; head < sequence.size(); ++head){
 			const size_t tail = std::min(head + SOURCE_LENGTH, sequence.size());
 			// Forward simulation
@@ -83,14 +96,16 @@ int main(int argc, char *argv[]){
 			int rotate = 0;
 			std::vector<State::UndoBuffer> ubs;
 			ubs.reserve(SOURCE_LENGTH);
+			const auto origin = state.wrappers(wid).position;
 			for(size_t i = head; i < tail; ++i){
 				const auto k = sequence[i].kind;
 				if(k != CommandKind::MOVE && k != CommandKind::ROTATE){ has_special = true; }
 				if(k == CommandKind::ROTATE){ rotate += sequence[i].args[0]; }
-				ubs.push_back(*state.evaluate(0, sequence[i]));
+				ubs.push_back(*state.evaluate(wid, sequence[i]));
 			}
-			const auto position = state.wrappers(0).position;
+			const auto position = state.wrappers(wid).position;
 			rotate &= 3;
+			if(manhattan_distance(origin, position) == (tail - head)){ has_special = true; }
 			// Enumerate affected cells
 			std::unordered_map<Vec2, CellKind> affected;
 			for(const auto& ub : ubs){
@@ -106,7 +121,7 @@ int main(int argc, char *argv[]){
 			// ID-DFS
 			for(int depth = 0; !has_special && depth < (tail - head); ++depth){
 				std::vector<Command> partial;
-				const auto ret = optimize(partial, depth, position, rotate, affected, 0, state);
+				const auto ret = optimize(partial, depth, wid, position, rotate, affected, 0, state);
 				if(ret){
 					const int remove_length = (tail - head) - depth;
 					std::cerr << head << "/" << sequence.size() << " => " << remove_length << std::endl;
@@ -116,7 +131,7 @@ int main(int argc, char *argv[]){
 				}
 			}
 			// Update state
-			state.evaluate(0, sequence[head]);
+			state.evaluate(wid, sequence[head]);
 		}
 		state.dump(std::cerr);
 		optimized_solution.push_back(sequence);

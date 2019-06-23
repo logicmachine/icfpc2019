@@ -84,6 +84,27 @@ def details(problem_id):
     ]
     return render_template('details.html', problem=problem, submissions=submissions)
 
+@app.route('/details_json/<int:problem_id>')
+def details_json(problem_id):
+    conn = get_db()
+    problem = { 'problem_id': problem_id }
+    submissions_query = '''
+    select id, score, author, created_at
+      from solutions
+      where problem_id=?
+      order by score asc
+    '''
+    submissions = [
+        {
+            'id': row['id'],
+            'score': row['score'],
+            'author': row['author'],
+            'created_at': row['created_at']
+        }
+        for row in conn.execute(submissions_query, (problem_id,))
+    ]
+    return jsonify(submissions)
+
 @app.route('/download/<int:submission_id>')
 def download(submission_id):
     conn = get_db()
@@ -98,6 +119,19 @@ def download(submission_id):
     response.mimetype = 'text/plain'
     return response
 
+@app.route('/boosters/<int:submission_id>')
+def boosters(submission_id):
+    conn = get_db()
+    query = 'select problem_id, buys from solutions where id=?'
+    row = conn.execute(query, (submission_id,)).fetchone()
+    if row is None:
+        abort(404)
+    name = 'prob-{:03d}-{:05d}.buy'.format(row['problem_id'], submission_id)
+    response = make_response()
+    response.data = row['buys']
+    response.headers['Content-Disposition'] = 'attachment; filename={}'.format(name)
+    response.mimetype = 'text/plain'
+    return response
 
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
@@ -108,9 +142,10 @@ def submit():
         problem_id = int(request.form['problem_id'])
         solution = request.form['solution']
         author = request.form['author']
+        boosters = '' if 'boosters' not in request.form else request.form['boosters']
         r = requests.post(
             'http://localhost:5001/verify/{}'.format(problem_id),
-            {'solution': solution})
+            {'solution': solution, 'boosters': boosters})
         if r.status_code == 404:
             success = False
             message = 'Problem not found'
@@ -119,20 +154,22 @@ def submit():
             success = response['success']
             message = response['message']
             if success:
-                query = 'insert into solutions (problem_id, score, content, author) values (?, ?, ?, ?)'
-                conn.execute(query, (problem_id, response['score'], solution, author))
+                query = 'insert into solutions (problem_id, score, content, author, buys) values (?, ?, ?, ?, ?)'
+                conn.execute(query, (problem_id, response['score'], solution, author, boosters))
                 conn.commit()
     return render_template('submit.html', success=success, message=message)
 
 @app.route('/make-zip')
 def make_zip():
     conn = get_db()
-    query = 'select problem_id, min(score), content from solutions group by problem_id'
+    query = 'select problem_id, min(score), content, buys from solutions group by problem_id'
     response = make_response()
     with TemporaryFile() as tf, ZipFile(tf, mode='w') as zf:
         for row in conn.execute(query):
             name = 'prob-{:03d}.sol'.format(row['problem_id'])
             zf.writestr(name, row['content'])
+            name = 'prob-{:03d}.buy'.format(row['problem_id'])
+            zf.writestr(name, row['buys'])
         zf.close()
         tf.seek(0)
         response.data = tf.read()

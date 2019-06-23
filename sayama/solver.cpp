@@ -15,6 +15,26 @@ using boardloader::Table;
 namespace xyzworker
 {
 
+class ManhattanNeighbor
+{
+public:
+    static std::array<int, 4> dx;
+    static std::array<int, 4> dy;
+};
+// Up, Left, Down, Right
+std::array<int, 4> ManhattanNeighbor::dy = { 1, 0, -1, 0 };
+std::array<int, 4> ManhattanNeighbor::dx = { 0, -1, 0, 1 };
+
+class ChebyshevNeighbor
+{
+public:
+    static std::array<int, 8> dx;
+    static std::array<int, 8> dy;
+};
+
+std::array<int, 8> ChebyshevNeighbor::dy = { 1, 0, -1, 0, -1, 1, -1, 1 };
+std::array<int, 8> ChebyshevNeighbor::dx = { 0, 1, 0, -1, 1, 1, -1, -1 };
+
 class Cluster
 {
 public:
@@ -43,8 +63,8 @@ std::vector<int> Cluster::cluster_count_by_bfs(Table<Cell>& board, std::vector<P
 
 Table<int> Cluster::clustering_by_bfs(Table<Cell>& board, std::vector<Point>& point_list)
 {
-    std::array<int, 4> dx = { 0, 1, 0, -1 };
-    std::array<int, 4> dy = { 1, 0, -1, 0 };
+    auto& dx = ChebyshevNeighbor::dx;
+    auto& dy = ChebyshevNeighbor::dy;
 
     const int height = board.size();
     const int width = board[0].size();
@@ -161,6 +181,27 @@ enum class Direction
     Right,
     None,
 };
+
+bool is_orthogonal(const Direction dir1, const Direction dir2)
+{
+    return (static_cast<int>(dir1) % 2) != (static_cast<int>(dir2) % 2);
+}
+
+Point to_point(const Direction direction)
+{
+    switch (direction)
+    {
+    case Direction::Up:
+        return Point(1, 0);
+    case Direction::Left:
+        return Point(0, -1);
+    case Direction::Down:
+        return Point(-1, 0);
+    case Direction::Right:
+        return Point(0, 1);
+    }
+    assert(false);
+}
 
 std::string direction_to_string(const Direction dir)
 {
@@ -322,12 +363,22 @@ public:
     std::vector<Point> gather_with(FUNCTION condition);
 
     template <typename FUNCTION>
-    bool bfs_move(FUNCTION condition);
+    Point bfs_move_point(FUNCTION condition);
+
+    template <typename FUNCTION>
+    std::vector<Direction> bfs_move(FUNCTION condition);
+
+    template <typename FUNCTION>
+    bool bfs_move_with_move(FUNCTION condition);
 
     template <typename FUNCTION>
     int shortest_distance_to(const Point& start, FUNCTION condition);
 
     void dfs_with_restart();
+
+    void divide_and_search();
+
+    std::vector<Point> select_optimize_region();
 
     void collect_optimal(std::vector<Point>& target_list);
 
@@ -341,10 +392,11 @@ public:
 
     void attach_command();
 
-private:
     void rotate_clockwise();
+
     void rotate_counterclockwise();
 
+private:
     void wrap();
 
     void dfs(int cy, int cx);
@@ -353,13 +405,24 @@ private:
 
     bool is_inside(int cy, int cx);
 
+    bool should_rotate_clockwise(Direction dir, int length);
+
+    int count_pass_empty(const Point& base, Direction move_dir, int move_length, Direction side_dir, int side_length);
+
     int get_empty_neighrbor_cell(int cy, int cx);
 
-    int get_empty_connected_cell(int cy, int cx, int upperbound);
+    int get_empty_connected_cell_count(int cy, int cx, int upperbound);
 
+    std::vector<Point> get_empty_connected_cell(int cy, int cx, int upperbound);
+
+    void generate_move_sequence(const std::vector<Direction>& move_list);
+
+    Table<bool> occupied;
     Table<Cell> table;
     int y;
     int x;
+
+    Direction player_direction;
 
     int height() const;
     int width() const;
@@ -369,9 +432,6 @@ private:
     std::vector<Point> manipulator_list;
 
     std::vector<Action> action_list;
-
-    std::array<int, 4> dx;
-    std::array<int, 4> dy;
 };
 
 int Worker::select_shortest(std::vector<Point>& target_list)
@@ -411,7 +471,7 @@ void Worker::collect_optimal(std::vector<Point>& target_list)
     {
         const Point target = target_list[idx];
 
-        bfs_move([&](Point& p) { return p == target; });
+        bfs_move_with_move([&](Point& p) { return p == target; });
 
         if (table[target.y][target.x] == Cell::ManipulatorExtension)
         {
@@ -435,16 +495,20 @@ void Worker::init(Table<Cell>& table, int y, int x)
         }
     }
 
-    // Up, Left, Down, Right
-    dy = { 1, 0, -1, 0 };
-    dx = { 0, -1, 0, 1 };
+    occupied.resize(height());
+    for (auto& row : occupied)
+    {
+        row.resize(width(), false);
+    }
 
     manipulator_list.emplace_back(0, 0);
     manipulator_list.emplace_back(1, 1);
     manipulator_list.emplace_back(-1, 1);
     manipulator_list.emplace_back(0, 1);
 
-    // wrap();
+    wrap();
+
+    player_direction = Direction::Right;
 }
 
 std::vector<Action>& Worker::get_action_list()
@@ -488,29 +552,33 @@ void Worker::copy_from(const Worker& src)
     {
         row.resize(src.width());
     }
+
+    occupied.resize(height());
+    for (auto& row : occupied)
+    {
+        row.resize(width(), false);
+    }
+
     for (int i = 0; i < height(); i++)
     {
         for (int j = 0; j < width(); j++)
         {
             table[i][j] = src.table[i][j];
+            occupied[i][j] = src.occupied[i][j];
         }
     }
 
     y = src.y;
     x = src.x;
 
-    for (int i = 0; i < 4; i++)
-    {
-        manipulator_list.push_back(src.manipulator_list[i]);
-    }
+    manipulator_list.emplace_back(0, 0);
+    manipulator_list.emplace_back(1, 1);
+    manipulator_list.emplace_back(-1, 1);
+    manipulator_list.emplace_back(0, 1);
 
     // action list doesn't have to share
 
-    for (int i = 0; i < 4; i++)
-    {
-        dy[i] = src.dy[i];
-        dx[i] = src.dx[i];
-    }
+    player_direction = Direction::Right;
 }
 
 Worker::Worker(const Worker& src)
@@ -527,7 +595,7 @@ Worker::Worker()
 
 bool Worker::is_empty(int cy, int cx)
 {
-    return table[cy][cx] != Cell::Obstacle && table[cy][cx] != Cell::Occupied;
+    return table[cy][cx] != Cell::Obstacle && !occupied[cy][cx];
 }
 
 void Worker::attach_command()
@@ -549,10 +617,11 @@ void Worker::clone_command()
 void Worker::move(Direction dir)
 {
     int index = static_cast<int>(dir);
-    y += dy[index];
-    x += dx[index];
+    y += ManhattanNeighbor::dy[index];
+    x += ManhattanNeighbor::dx[index];
     action_list.emplace_back(ActionType::Move, dir);
-    // wrap();
+
+    wrap();
 }
 
 bool Worker::is_inside(int cy, int cx)
@@ -587,7 +656,7 @@ void Worker::wrap()
             }
             else if (table[ny][nx] != Cell::Obstacle)
             {
-                table[ny][nx] = Cell::Occupied;
+                occupied[ny][nx] = true;
             }
         }
     }
@@ -595,6 +664,7 @@ void Worker::wrap()
 
 void Worker::rotate_clockwise()
 {
+    player_direction = clockwise(player_direction);
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -602,10 +672,12 @@ void Worker::rotate_clockwise()
         p.y = -px;
         p.x = py;
     }
+    action_list.emplace_back(ActionType::TurnClockwise);
 }
 
 void Worker::rotate_counterclockwise()
 {
+    player_direction = counter_clockwise(player_direction);
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -613,6 +685,7 @@ void Worker::rotate_counterclockwise()
         p.y = px;
         p.x = -py;
     }
+    action_list.emplace_back(ActionType::TurnCounterClockwise);
 }
 
 Worker::Worker(Table<Cell>& table, int y, int x)
@@ -643,8 +716,8 @@ int Worker::shortest_distance_to(const Point& start, FUNCTION condition)
 
         for (int i = 0; i < 4; i++)
         {
-            const int ny = p.y + dy[i];
-            const int nx = p.x + dx[i];
+            const int ny = p.y + ManhattanNeighbor::dy[i];
+            const int nx = p.x + ManhattanNeighbor::dx[i];
 
             if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && !visited[ny][nx])
             {
@@ -656,8 +729,116 @@ int Worker::shortest_distance_to(const Point& start, FUNCTION condition)
     return 100000;
 }
 
+int Worker::count_pass_empty(const Point& base, Direction move_dir, int move_length, Direction side_dir, int side_length)
+{
+    int count = 0;
+
+    Point dm = to_point(move_dir);
+    Point ds = to_point(side_dir);
+
+    Point cur(base);
+
+    for (int i = 0; i < move_length; i++)
+    {
+        Point cur2(cur);
+        for (int j = 0; j < side_length; j++)
+        {
+            if (is_inside(cur2.y, cur2.x) && is_empty(cur2.y, cur2.x))
+            {
+                count++;
+            }
+            else if (table[y][x] == Cell::Obstacle)
+            {
+                break;
+            }
+            cur2 += ds;
+        }
+        cur += dm;
+    }
+    return count;
+}
+
+bool Worker::should_rotate_clockwise(Direction move_dir, int move_length)
+{
+    Point current(y, x);
+    const int side_length = manipulator_list.size() - 3;
+
+    const int eval_clockwise = count_pass_empty(current, move_dir, move_length, clockwise(player_direction), side_length);
+    const int eval_counterclockwise = count_pass_empty(current, move_dir, move_length, counter_clockwise(player_direction), side_length);
+
+    return eval_clockwise > eval_counterclockwise;
+}
+
+void Worker::generate_move_sequence(const std::vector<Direction>& move_list)
+{
+    int index = 0;
+    while (index < move_list.size())
+    {
+        int begin = index;
+        while (index < move_list.size() && move_list[begin] == move_list[index])
+        {
+            index++;
+        }
+        if (index - begin > 2)
+        {
+            if (manipulator_list.size() > 4)
+            {
+                if (!is_orthogonal(player_direction, move_list[begin]))
+                {
+                    if (should_rotate_clockwise(move_list[begin], index - begin))
+                    {
+                        rotate_clockwise();
+                    }
+                    else
+                    {
+                        rotate_counterclockwise();
+                    }
+                }
+            }
+            else
+            {
+                if (is_orthogonal(player_direction, move_list[begin]))
+                {
+                    rotate_counterclockwise();
+                }
+            }
+        }
+        for (int i = begin; i < index; i++)
+        {
+            move(move_list[i]);
+        }
+    }
+}
+
 template <typename FUNCTION>
-bool Worker::bfs_move(FUNCTION condition)
+Point Worker::bfs_move_point(FUNCTION condition)
+{
+    auto move_list = bfs_move(condition);
+    Point cur(y, x);
+    for (auto& v : move_list)
+    {
+        cur += to_point(v);
+    }
+    return cur;
+}
+
+template <typename FUNCTION>
+bool Worker::bfs_move_with_move(FUNCTION condition)
+{
+    auto move_list = bfs_move(condition);
+    if (!move_list.empty())
+    {
+        generate_move_sequence(move_list);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+template <typename FUNCTION>
+std::vector<Direction> Worker::bfs_move(FUNCTION condition)
 {
     Table<Direction> recur(height(), std::vector<Direction>(width(), Direction::None));
     // 何でも良い
@@ -678,22 +859,18 @@ bool Worker::bfs_move(FUNCTION condition)
             {
                 const Direction inv_dir = recur[p.y][p.x];
                 const int index = static_cast<int>(inv_dir);
-                p.y += dy[index];
-                p.x += dx[index];
+                p.y += ManhattanNeighbor::dy[index];
+                p.x += ManhattanNeighbor::dx[index];
                 move_list.push_back(inverse(inv_dir));
             }
             std::reverse(move_list.begin(), move_list.end());
-            for (auto m : move_list)
-            {
-                move(m);
-            }
-            return true;
+            return move_list;
         }
 
         for (int i = 0; i < 4; i++)
         {
-            const int ny = p.y + dy[i];
-            const int nx = p.x + dx[i];
+            const int ny = p.y + ManhattanNeighbor::dy[i];
+            const int nx = p.x + ManhattanNeighbor::dx[i];
 
             if (is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle && recur[ny][nx] == Direction::None)
             {
@@ -702,37 +879,45 @@ bool Worker::bfs_move(FUNCTION condition)
             }
         }
     }
-    return false;
+    std::vector<Direction> ret;
+    return ret;
 }
 
-int Worker::get_empty_connected_cell(int cy, int cx, int upperbound)
+int Worker::get_empty_connected_cell_count(int cy, int cx, int upperbound)
+{
+    auto ret = get_empty_connected_cell(cy, cx, upperbound);
+    return ret.size();
+}
+
+std::vector<Point> Worker::get_empty_connected_cell(int cy, int cx, int upperbound)
 {
     std::queue<Point> que;
     que.emplace(cy, cx);
 
     Table<bool> visited(height(), std::vector<bool>(width(), false));
 
-    int count = 0;
+    std::vector<Point> ret;
+    ret.emplace_back(cy, cx);
 
-    while (!que.empty() && count < upperbound)
+    while (!que.empty() && ret.size() < upperbound)
     {
         Point p = que.front();
         que.pop();
 
         for (int i = 0; i < 4; i++)
         {
-            const int ny = p.y + dy[i];
-            const int nx = p.x + dx[i];
+            const int ny = p.y + ManhattanNeighbor::dy[i];
+            const int nx = p.x + ManhattanNeighbor::dx[i];
 
             if (is_inside(ny, nx) && is_empty(ny, nx) && !visited[ny][nx])
             {
                 visited[ny][nx] = true;
                 que.emplace(ny, nx);
-                count++;
+                ret.emplace_back(ny, nx);
             }
         }
     }
-    return count;
+    return ret;
 }
 
 int Worker::get_empty_neighrbor_cell(int cy, int cx)
@@ -740,8 +925,8 @@ int Worker::get_empty_neighrbor_cell(int cy, int cx)
     int count = 0;
     for (int i = 0; i < 4; i++)
     {
-        const int ny = cy + dy[i];
-        const int nx = cx + dx[i];
+        const int ny = cy + ManhattanNeighbor::dy[i];
+        const int nx = cx + ManhattanNeighbor::dx[i];
         if (is_inside(ny, nx) && is_empty(ny, nx))
         {
             count++;
@@ -759,20 +944,44 @@ bool Worker::reset_to_small_region()
 
         for (int i = 0; i < 4; i++)
         {
-            const int ny = my + dy[i];
-            const int nx = mx + dx[i];
+            const int ny = my + ManhattanNeighbor::dy[i];
+            const int nx = mx + ManhattanNeighbor::dx[i];
 
             constexpr int upperbound = 50;
 
-            if (is_inside(ny, nx) && is_empty(ny, nx) && get_empty_connected_cell(ny, nx, upperbound) < upperbound)
+            if (is_inside(ny, nx) && is_empty(ny, nx) && get_empty_connected_cell_count(ny, nx, upperbound) < upperbound)
             {
                 // move (y, x) -> (ny, nx)
-                bfs_move([&](Point& p) { return p.y == ny && p.x == nx; });
+                bfs_move_with_move([&](Point& p) { return p.y == ny && p.x == nx; });
                 return true;
             }
         }
     }
     return false;
+}
+
+std::vector<Point> Worker::select_optimize_region()
+{
+    auto empty_nearest = bfs_move_point([&](Point& p) { return is_empty(p.y, p.x); });
+}
+
+void Worker::divide_and_search()
+{
+    Table<bool> target_region(height(), std::vector<bool>(width(), false));
+
+    while (true)
+    {
+        // select_region_to_optimize();
+        std::vector<Point> region_to_optimize = select_optimize_region();
+
+        // if not empty
+
+        // move to nearest_empty
+
+        // beam_search
+
+        // apply
+    }
 }
 
 void Worker::dfs_with_restart()
@@ -781,16 +990,14 @@ void Worker::dfs_with_restart()
 
     while (true)
     {
-        wrap();
-
         if (!reset_to_small_region())
         {
             selected.clear();
 
             for (int i = 0; i < 4; i++)
             {
-                const int ny = y + dy[i];
-                const int nx = x + dx[i];
+                const int ny = y + ManhattanNeighbor::dy[i];
+                const int nx = x + ManhattanNeighbor::dx[i];
                 if (is_inside(ny, nx) && is_empty(ny, nx))
                 {
                     const Direction dir = static_cast<Direction>(i);
@@ -799,7 +1006,7 @@ void Worker::dfs_with_restart()
             }
             if (selected.empty())
             {
-                if (!bfs_move([&](Point& p) { return is_empty(p.y, p.x); }))
+                if (!bfs_move_with_move([&](Point& p) { return is_empty(p.y, p.x); }))
                 {
                     break;
                 }
@@ -815,12 +1022,12 @@ void Worker::dfs_with_restart()
 
 void Worker::dfs(int cy, int cx)
 {
-    table[cy][cx] = Cell::Occupied;
+    occupied[cy][cx] = true;
 
     for (int i = 0; i < 4; i++)
     {
-        const int ny = cy + dy[i];
-        const int nx = cx + dx[i];
+        const int ny = cy + ManhattanNeighbor::dy[i];
+        const int nx = cx + ManhattanNeighbor::dx[i];
         if (is_inside(ny, nx) && is_empty(ny, nx))
         {
             const Direction dir = static_cast<Direction>(i);
@@ -880,6 +1087,15 @@ std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_
 
     std::vector<Point> input(cluster_count);
 
+    std::vector<int> target_list(cluster_count, 0);
+    const int empty_count = worker_list[0].gather(Cell::Empty).size();
+    constexpr double additional_0 = 0.2;
+    target_list[0] = static_cast<int>(empty_count * (1.0 + additional_0) / (cluster_count + additional_0));
+    for (int i = 1; i < cluster_count; i++)
+    {
+        target_list[i] = static_cast<int>(empty_count / (cluster_count + additional_0));
+    }
+
     for (int i = 0; i < 3000; i++)
     {
         for (int j = 0; j < cluster_count; j++)
@@ -887,7 +1103,11 @@ std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_
             input[j] = candidate[rand(mt)];
         }
         auto clusters = cluster.cluster_count_by_bfs(table, input);
-        const int eval = *std::max_element(clusters.begin(), clusters.end()) - *std::min_element(clusters.begin(), clusters.end());
+        int eval = 0;
+        for (int j = 0; j < cluster_count; j++)
+        {
+            eval += std::abs(target_list[j] - clusters[j]);
+        }
         if (best_eval > eval)
         {
             best_eval = eval;
@@ -967,19 +1187,19 @@ std::vector<std::vector<Action>> Solver::solve()
             Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), base_point_list);
 
             const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
-            worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
+            worker_list[0].bfs_move_with_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
 
             for (int i = 1; i <= num_clone; i++)
             {
                 worker_list[i].copy_from(worker_list[0]);
                 worker_list[0].clone_command();
 
-                worker_list[i].bfs_move([&](Point& p) { return p == base_point_list[i]; });
+                worker_list[i].bfs_move_with_move([&](Point& p) { return p == base_point_list[i]; });
                 fill_obstacle(clustering_result, worker_list[i].get_table(), i);
                 worker_list[i].dfs_with_restart();
             }
 
-            worker_list[0].bfs_move([&](Point& p) { return p == base_point_list[0]; });
+            worker_list[0].bfs_move_with_move([&](Point& p) { return p == base_point_list[0]; });
             fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
         }
         worker_list[0].dfs_with_restart();
