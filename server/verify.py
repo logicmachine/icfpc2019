@@ -26,10 +26,11 @@ def get_db():
         g.db = sqlite3.connect('database.db', detect_types=sqlite3.PARSE_DECLTYPES)
     return g.db
 
-def run_validation(problem_path, solution_path):
+def run_validation(problem_path, solution_path, boosters_path):
     driver = get_driver()
     driver.find_element_by_id('submit_task').send_keys(os.path.abspath(problem_path))
     driver.find_element_by_id('submit_solution').send_keys(os.path.abspath(solution_path))
+    driver.find_element_by_id('submit_boosters').send_keys(os.path.abspath(boosters_path))
     driver.find_element_by_id('execute_solution').click()
     while True:
         status = driver.find_element_by_id('output').text.strip()
@@ -55,12 +56,15 @@ def verify(problem_id=None):
             abort(404)
         problem = row[0]
     solution = request.form['solution']
-    with NamedTemporaryFile() as pf, NamedTemporaryFile() as sf:
+    boosters = '' if 'boosters' not in request.form else request.form['boosters']
+    with NamedTemporaryFile() as pf, NamedTemporaryFile() as sf, NamedTemporaryFile() as bf:
         pf.write(problem.encode('utf-8'))
         pf.flush()
         sf.write(solution.encode('utf-8'))
         sf.flush()
-        status = run_validation(pf.name, sf.name)
+        bf.write(boosters.encode('utf-8'))
+        bf.flush()
+        status = run_validation(pf.name, sf.name, bf.name)
     return jsonify(status)
 
 if __name__ == '__main__':
