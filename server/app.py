@@ -84,6 +84,27 @@ def details(problem_id):
     ]
     return render_template('details.html', problem=problem, submissions=submissions)
 
+@app.route('/details_json/<int:problem_id>')
+def details_json(problem_id):
+    conn = get_db()
+    problem = { 'problem_id': problem_id }
+    submissions_query = '''
+    select id, score, author, created_at
+      from solutions
+      where problem_id=?
+      order by score asc
+    '''
+    submissions = [
+        {
+            'id': row['id'],
+            'score': row['score'],
+            'author': row['author'],
+            'created_at': row['created_at']
+        }
+        for row in conn.execute(submissions_query, (problem_id,))
+    ]
+    return jsonify(submissions)
+
 @app.route('/download/<int:submission_id>')
 def download(submission_id):
     conn = get_db()
