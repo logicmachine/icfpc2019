@@ -401,6 +401,22 @@ Table<Cell> load_board(const std::string& filepath, int& start_y, int& start_x)
     {
         v -= min_point;
     }
+    for (auto& v : obstacles)
+    {
+        for (auto& vv : v)
+        {
+            vv -= min_point;
+        }
+    }
+    for (auto& v : booster)
+    {
+        for (auto& p : v.second)
+        {
+            p -= min_point;
+        }
+    }
+    start_y -= min_point.y;
+    start_x -= min_point.x;
 
     Table<Cell> table;
     table.resize(max_point.y);
