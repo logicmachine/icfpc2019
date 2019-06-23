@@ -389,7 +389,7 @@ public:
     }
 };
 
-
+/*
 void dfs( Worker &robot, vector<vector<bool>>& occupied ){
     //    cout << robot.y << " " << robot.x << endl;
     
@@ -562,6 +562,7 @@ void multiDfs( Worker &robot, vector<vector<bool>>& occupied, long long  robot_b
         assert( robot.doAction( rev_actions ) );
     }
 }
+*/
 
 
 string getFilename( int n ){
@@ -715,6 +716,31 @@ bool useAllClone( Worker& robot ){
     return true;
 }
 
+/*
+bool useAllClone( Worker& robot ){
+    if( not robot.hasItem( C ) ){
+        return false;
+    }
+
+    while( robot.hasItem( C ) ){
+        int items_num = robot.countItem( C );
+
+        vector<Action> clone_actions;
+        int idle_robot_num = robot.robot_num;
+
+        for(int i=0; i<idle_robot_num; ++i ){
+            if( items_num>0 ){
+                clone_actions.push_back( Action( "C", i ) );
+                items_num--;
+            }else{
+                break;
+            }
+        }
+        assert( robot.doAction( clone_actions ) );
+    }
+    return true;
+}
+*/
 
 namespace futa{
     void get_ccl_data(const std::vector<std::vector<Cell>>& table, std::vector<int>& data, int& W){
@@ -791,8 +817,6 @@ int main(){
             cerr << endl;
         }
         
-        exit(1); // exit!!!!!!!!!!!!
-
         // Find target Cell position
         Cell target_cell = boardloader::Cloning;
         vector<pair<int,int>> items_pos;
@@ -811,10 +835,12 @@ int main(){
         assert( useAllClone( robot ) );
         cerr << "End using" << endl;
 
+        /*
         vector<vector<bool>> occupied( field.size(), vector<bool>(field[0].size(), false) );
         occupied[robot.y[0]][robot.x[0]] = true;
         //dfs( robot, occupied );
         multiDfs( robot, occupied, (1<<robot.robot_num)-1 );
+        */
 
         ofstream sol_fs( filename + ".sol" );
         robot.dump_actions( sol_fs );
