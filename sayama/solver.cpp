@@ -43,8 +43,8 @@ std::vector<int> Cluster::cluster_count_by_bfs(Table<Cell>& board, std::vector<P
 
 Table<int> Cluster::clustering_by_bfs(Table<Cell>& board, std::vector<Point>& point_list)
 {
-    std::array<int, 4> dx = { 0, 1, 0, -1 };
-    std::array<int, 4> dy = { 1, 0, -1, 0 };
+    std::array<int, 8> dx = { 0, 1, 0, -1, 1, 1, -1, -1 };
+    std::array<int, 8> dy = { 1, 0, -1, 0, -1, 1, -1, 1 };
 
     const int height = board.size();
     const int width = board[0].size();
@@ -343,12 +343,22 @@ public:
     std::vector<Point> gather_with(FUNCTION condition);
 
     template <typename FUNCTION>
-    bool bfs_move(FUNCTION condition);
+    Point bfs_move_point(FUNCTION condition);
+
+    template <typename FUNCTION>
+    std::vector<Direction> bfs_move(FUNCTION condition);
+
+    template <typename FUNCTION>
+    bool bfs_move_with_move(FUNCTION condition);
 
     template <typename FUNCTION>
     int shortest_distance_to(const Point& start, FUNCTION condition);
 
     void dfs_with_restart();
+
+    void divide_and_search();
+
+    std::vector<Point> select_optimize_region();
 
     void collect_optimal(std::vector<Point>& target_list);
 
@@ -362,10 +372,11 @@ public:
 
     void attach_command();
 
-private:
     void rotate_clockwise();
+
     void rotate_counterclockwise();
 
+private:
     void wrap();
 
     void dfs(int cy, int cx);
@@ -441,7 +452,7 @@ void Worker::collect_optimal(std::vector<Point>& target_list)
     {
         const Point target = target_list[idx];
 
-        bfs_move([&](Point& p) { return p == target; });
+        bfs_move_with_move([&](Point& p) { return p == target; });
 
         if (table[target.y][target.x] == Cell::ManipulatorExtension)
         {
@@ -790,7 +801,34 @@ void Worker::generate_move_sequence(const std::vector<Direction>& move_list)
 }
 
 template <typename FUNCTION>
-bool Worker::bfs_move(FUNCTION condition)
+Point Worker::bfs_move_point(FUNCTION condition)
+{
+    auto move_list = bfs_move(condition);
+    Point cur(y, x);
+    for (auto& v : move_list)
+    {
+        cur += to_point(v);
+    }
+    return cur;
+}
+
+template <typename FUNCTION>
+bool Worker::bfs_move_with_move(FUNCTION condition)
+{
+    auto move_list = bfs_move(condition);
+    if (!move_list.empty())
+    {
+        generate_move_sequence(move_list);
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+template <typename FUNCTION>
+std::vector<Direction> Worker::bfs_move(FUNCTION condition)
 {
     Table<Direction> recur(height(), std::vector<Direction>(width(), Direction::None));
     // 何でも良い
@@ -816,8 +854,7 @@ bool Worker::bfs_move(FUNCTION condition)
                 move_list.push_back(inverse(inv_dir));
             }
             std::reverse(move_list.begin(), move_list.end());
-            generate_move_sequence(move_list);
-            return true;
+            return move_list;
         }
 
         for (int i = 0; i < 4; i++)
@@ -832,7 +869,8 @@ bool Worker::bfs_move(FUNCTION condition)
             }
         }
     }
-    return false;
+    std::vector<Direction> ret;
+    return ret;
 }
 
 int Worker::get_empty_connected_cell(int cy, int cx, int upperbound)
@@ -897,12 +935,36 @@ bool Worker::reset_to_small_region()
             if (is_inside(ny, nx) && is_empty(ny, nx) && get_empty_connected_cell(ny, nx, upperbound) < upperbound)
             {
                 // move (y, x) -> (ny, nx)
-                bfs_move([&](Point& p) { return p.y == ny && p.x == nx; });
+                bfs_move_with_move([&](Point& p) { return p.y == ny && p.x == nx; });
                 return true;
             }
         }
     }
     return false;
+}
+
+std::vector<Point> Worker::select_optimize_region()
+{
+    auto empty_nearest = bfs_move_point([&](Point& p) { return is_empty(p.y, p.x); });
+}
+
+void Worker::divide_and_search()
+{
+    Table<bool> target_region(height(), std::vector<bool>(width(), false));
+
+    while (true)
+    {
+        // select_region_to_optimize();
+        std::vector<Point> region_to_optimize = select_optimize_region();
+
+        // if not empty
+
+        // move to nearest_empty
+
+        // beam_search
+
+        // apply
+    }
 }
 
 void Worker::dfs_with_restart()
@@ -927,7 +989,7 @@ void Worker::dfs_with_restart()
             }
             if (selected.empty())
             {
-                if (!bfs_move([&](Point& p) { return is_empty(p.y, p.x); }))
+                if (!bfs_move_with_move([&](Point& p) { return is_empty(p.y, p.x); }))
                 {
                     break;
                 }
@@ -1008,6 +1070,15 @@ std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_
 
     std::vector<Point> input(cluster_count);
 
+    std::vector<int> target_list(cluster_count, 0);
+    const int empty_count = worker_list[0].gather(Cell::Empty).size();
+    constexpr double additional_0 = 0.2;
+    target_list[0] = static_cast<int>(empty_count * (1.0 + additional_0) / (cluster_count + additional_0));
+    for (int i = 1; i < cluster_count; i++)
+    {
+        target_list[i] = static_cast<int>(empty_count / (cluster_count + additional_0));
+    }
+
     for (int i = 0; i < 3000; i++)
     {
         for (int j = 0; j < cluster_count; j++)
@@ -1015,7 +1086,11 @@ std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_
             input[j] = candidate[rand(mt)];
         }
         auto clusters = cluster.cluster_count_by_bfs(table, input);
-        const int eval = *std::max_element(clusters.begin(), clusters.end()) - *std::min_element(clusters.begin(), clusters.end());
+        int eval = 0;
+        for (int j = 0; j < cluster_count; j++)
+        {
+            eval += std::abs(target_list[j] - clusters[j]);
+        }
         if (best_eval > eval)
         {
             best_eval = eval;
@@ -1095,19 +1170,19 @@ std::vector<std::vector<Action>> Solver::solve()
             Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), base_point_list);
 
             const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
-            worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
+            worker_list[0].bfs_move_with_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
 
             for (int i = 1; i <= num_clone; i++)
             {
                 worker_list[i].copy_from(worker_list[0]);
                 worker_list[0].clone_command();
 
-                worker_list[i].bfs_move([&](Point& p) { return p == base_point_list[i]; });
+                worker_list[i].bfs_move_with_move([&](Point& p) { return p == base_point_list[i]; });
                 fill_obstacle(clustering_result, worker_list[i].get_table(), i);
                 worker_list[i].dfs_with_restart();
             }
 
-            worker_list[0].bfs_move([&](Point& p) { return p == base_point_list[0]; });
+            worker_list[0].bfs_move_with_move([&](Point& p) { return p == base_point_list[0]; });
             fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
         }
         worker_list[0].dfs_with_restart();
