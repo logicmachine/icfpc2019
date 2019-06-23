@@ -40,6 +40,16 @@ public:
     pair<int,int> operand;
     int user_num;
     
+    bool operator == (Action obj) const{
+        if( opcode != obj.opcode )         return false;
+        else if( operand != obj.operand )  return false;
+        else if( user_num != obj.user_num )return false;
+        else return true;
+    }
+    bool operator != (Action obj) const{
+        return not (*this == obj);
+    }
+
     Action(){ opcode = ""; operand = make_pair( -1, -1 ); user_num = -1; } 
     Action( string opc ): opcode(opc) { operand = make_pair( -1, -1 ); }
     Action( string opc, pair<int,int> oper ): opcode(opc), operand(oper) {}
@@ -113,7 +123,7 @@ public:
             for( int j=min(src_x, dst_x); j<max(src_x, dst_x); ++j ){
                 for( int k=0; k<4; ++k ){
                     if( field[i][j] == boardloader::Obstacle and isIntersect( src_y+0.5, src_x+0.5, dst_y+0.5, dst_x+0.5, i+dy[k], j+dx[k], i+dy[k+1], j+dx[k+1] ) ){
-                        cout << "field[" << i << "][" << j << "] = " << field[i][j] << " " << "intersect : " << src_y+0.5 << "_" << src_x+0.5 << " " << dst_y+0.5 << "_" << dst_x+0.5 << " " << i+dy[k] << "_" << j+dx[k] << " " << i+dy[k+1] << "_" << j+dx[k+1] << endl;
+                        //cout << "field[" << i << "][" << j << "] = " << field[i][j] << " " << "intersect : " << src_y+0.5 << "_" << src_x+0.5 << " " << dst_y+0.5 << "_" << dst_x+0.5 << " " << i+dy[k] << "_" << j+dx[k] << " " << i+dy[k+1] << "_" << j+dx[k+1] << endl;
                         return false;
                     }
                 }
@@ -150,10 +160,15 @@ public:
         
         for( int rb=0; rb<act_list.size(); ++rb ){
             Action act = act_list[rb];
-            cout << act.opcode << endl;
+            //cerr << "act : " << act.opcode << endl;
+            if( act == Action() )continue;
             
             if( act.opcode == "W" ){ // move_up
-                if( y[rb]+1 >= H or field[y[rb]+1][x[rb]]==boardloader::Obstacle ){
+                if( y[rb]+1 >= H ){
+                    cerr << "range_error" << endl;
+                    return false;
+                }else if( field[y[rb]+1][x[rb]]==boardloader::Obstacle ){
+                    cerr << "Go on Obstacle" << endl;
                     return false;
                 }else{
                     int y_new = y[rb];
@@ -178,7 +193,11 @@ public:
                 }
                 
             }else if( act.opcode == "S" ){ // move_down
-                if( y[rb]-1 < 0 or field[y[rb]-1][x[rb]] == boardloader::Obstacle ){
+                if( y[rb]-1 < 0){
+                    cerr << "range_error" << endl;
+                    return false;
+                }else if( field[y[rb]-1][x[rb]] == boardloader::Obstacle ){
+                    cerr << "Go on Obstacle" << endl;
                     return false;
                 }else{
                     int y_new = y[rb]-1;
@@ -204,7 +223,11 @@ public:
                 }
                 
             }else if( act.opcode == "A" ){ // move_left
-                if( x[rb]-1<0 or field[y[rb]][x[rb]-1] == boardloader::Obstacle ){
+                if( x[rb]-1<0){
+                    cerr << "range_error" << endl;
+                    return false;
+                }else if( field[y[rb]][x[rb]-1] == boardloader::Obstacle ){
+                    cerr << "Go on Obstacle" << endl;
                     return false;
                 }else{
                     int x_new = x[rb]-1;
@@ -230,7 +253,11 @@ public:
                 }
                 
             }else if( act.opcode == "D" ){ // move_right
-                if( x[rb]+1>=W or field[y[rb]][x[rb]+1] == boardloader::Obstacle ){
+                if( x[rb]+1>=W ){
+                    cerr << "range_error" << endl;
+                    return false;
+                }else if( field[y[rb]][x[rb]+1] == boardloader::Obstacle ){
+                    cerr << "Go on Obstacle" << endl;
                     return false;
                 }else{
                     int x_new = x[rb]+1;
@@ -386,6 +413,157 @@ void dfs( Worker &robot, vector<vector<bool>>& occupied ){
     }
 }
 
+void multiDfs( Worker &robot, vector<vector<bool>>& occupied, long long  robot_bit ){
+    assert( robot.robot_num < 60 );
+
+    vector<int> members;
+    for(int i=0; i<robot.robot_num; ++i ){
+        if( robot_bit & (1<<i) ){
+            members.push_back( i );
+        }
+    }
+    assert( members.size() == __builtin_popcountll( robot_bit ) );
+    assert( members.size() > 0 );
+    int leader_robot_num = members[0];
+    assert( leader_robot_num < robot.robot_num );
+
+#ifndef NDEBUG
+    for( auto rob_num: members ){
+        assert( robot.y[leader_robot_num] == robot.y[rob_num] );
+        assert( robot.x[leader_robot_num] == robot.x[rob_num] );
+    }
+#endif
+
+    int dy[] = {0, -1, 0, 1};
+    int dx[] = {1, 0, -1, 0};
+    string direction[] = {"D", "S", "A", "W"};
+    
+    int candidate_num = 0;
+    vector<int> cand_k;
+
+    for( int k=0; k<4; ++k ){
+        int ddy = robot.y[ leader_robot_num ] + dy[k];
+        int ddx = robot.x[ leader_robot_num ] + dx[k];
+        if( ddy<0 or ddy>=occupied.size() or ddx<0 or ddx>=occupied[0].size() )continue;
+        if( occupied[ddy][ddx] == false and robot.field[ddy][ddx] != boardloader::Obstacle ){
+            occupied[ddy][ddx] = true;
+            candidate_num++;
+            cand_k.push_back( k );
+        }
+    }
+    assert( candidate_num == cand_k.size() );
+    if( candidate_num == 0 ) return ;
+
+    // Assign task to each robots
+    int responsible_robot_num = members.size();    
+
+    vector<int> robot_alloc( 4, 0 );
+    assert( candidate_num != 0 );
+    int robot_num_of_each_dir = responsible_robot_num / candidate_num;
+    for( auto k: cand_k ){
+        robot_alloc[k] = robot_num_of_each_dir;
+    }
+
+    responsible_robot_num -= robot_num_of_each_dir * candidate_num;
+    assert( responsible_robot_num >= 0 );
+    assert( responsible_robot_num < candidate_num );
+
+    for( auto k: cand_k){
+        if( responsible_robot_num<=0 )break;
+        robot_alloc[k]++;
+        responsible_robot_num--;
+    }
+
+    assert( responsible_robot_num == 0 );
+
+#ifndef NDEBUG
+    int alloc_sum = accumulate( robot_alloc.begin(), robot_alloc.end(), 0 );
+    assert( alloc_sum == members.size() );
+#endif
+
+    // Deside responsible_robot_bit
+    vector<int> responsible_robot_bit(4, 0);
+    auto idle_robots = robot_bit;
+    for( auto k: cand_k ){
+        assert( k<4 );
+        int ddy = robot.y[ leader_robot_num ] + dy[k];
+        int ddx = robot.x[ leader_robot_num ] + dx[k];
+        assert( not (ddy<0 or ddy>=occupied.size() or ddx<0 or ddx>=occupied[0].size()) );
+        assert( robot.field[ddy][ddx] != boardloader::Obstacle );
+
+        int new_bit = 0;
+
+        for(int i=0; i<robot.robot_num; ++i ){
+            if( (idle_robots & (1<<i)) && robot_alloc[k]>0 ){
+                idle_robots ^= (1<<i);
+                robot_alloc[k]--;
+                new_bit |= (1<<i);
+            }
+        }
+        responsible_robot_bit[k] = new_bit;
+    }
+    
+    assert( idle_robots == 0 );
+
+#ifndef NDEBUG
+    for( auto elm: robot_alloc ){
+        assert( elm == 0 );
+    }
+
+    int bit_sum = accumulate( responsible_robot_bit.begin(), responsible_robot_bit.end(), 0 );
+    assert( bit_sum = robot_bit );
+#endif
+
+    assert( responsible_robot_bit[cand_k[0]] != 0 );
+
+    // Assign adjustment
+    if( candidate_num > members.size() ){
+        for( int i=1; i<cand_k.size(); ++i ){
+            if( responsible_robot_bit[cand_k[i]] == 0 ){
+                assert( (i-1)>=0 );
+                responsible_robot_bit[cand_k[i]] = responsible_robot_bit[ cand_k[(i-1)/2] ];
+            }
+        }
+    }
+
+    // Execute
+    for( auto k: cand_k ){
+        assert( k<4 );
+        int ddy = robot.y[ leader_robot_num ] + dy[k];
+        int ddx = robot.x[ leader_robot_num ] + dx[k];
+        assert( not (ddy<0 or ddy>=occupied.size() or ddx<0 or ddx>=occupied[0].size()) );
+        assert( robot.field[ddy][ddx] != boardloader::Obstacle );
+        vector<Action> actions, rev_actions;
+        for(int i=0; i<robot.robot_num; ++i ){
+            if( responsible_robot_bit[k] & (1<<i) ){
+                actions    .push_back( Action(direction[k]) );
+                rev_actions.push_back( Action(direction[(k+2)%4]) );
+            }else{
+                actions    .push_back( Action() );
+                rev_actions.push_back( Action() );
+            }
+        }
+
+#ifndef NDEBUG
+        assert( actions.size() == robot.robot_num );
+        for( int i=0; i<robot.robot_num; ++i ){
+            if( actions[i] != Action() ){
+                assert( robot_bit & (1<<i) );
+            }
+            if( rev_actions[i] != Action() ){
+                assert( robot_bit & (1<<i) );
+            }
+        }
+#endif
+        assert( robot.doAction( actions ) );
+        assert( responsible_robot_bit[k] != 0 );
+        multiDfs( robot, occupied, responsible_robot_bit[k] );
+
+        assert( robot.doAction( rev_actions ) );
+    }
+}
+
+
 string getFilename( int n ){
     stringstream ss;
     ss << "prob-" << setfill('0') << setw(3) << right << n;
@@ -471,27 +649,8 @@ bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Work
         
         order.insert( order.begin(), items_pos.back() );
         
-        
-        val = 1e9;
-        pair<int,int> nearest_myst = make_pair(-1, -1);
-        for( int i=0; i<robot.field.size(); ++i ){
-            for( int j=0; j<robot.field[0].size(); ++ j){
-                if( robot.field[i][j] == boardloader::Mysterious ){
-                    int res = ikeda::calc_distance( robot.field, {order.back().first, order.back().second}, {i, j} );
-                    if( res<val ){
-                        val = res;
-                        nearest_myst = make_pair( i, j );
-                    }
-                }
-            }
-        }
-        if( val == 1e9 )return false;
-        
-        order.push_back( nearest_myst );
-        
         string move_string = "";
         for( int i=0; i<order.size()-1; ++i ){
-            cout << order[i].first << " " << order[i].second << "---" << order[i+1].first << " " << order[i+1].second << endl;
             move_string += ikeda::move( robot.field, {order[i].first, order[i].second}, {order[i+1].first, order[i+1].second} );
         }
         
@@ -499,53 +658,96 @@ bool correct_items( int cur_y, int cur_x, vector<pair<int,int>>& items_pos, Work
             assert( robot.doAction( {Action( string(1, elm) )} ) );
         }
 
+
         return true;
     }
 }
 
+bool moveToTargetCell( Worker& robot, const int& y, const int& x, const Cell& type ){
+    int val = 1e9;
+    pair<int,int> nearest_myst = make_pair(-1, -1);
+    
+    int H = robot.field.size();
+    int W = robot.field[0].size();
+    for( int i=0; i<H; ++i ){
+        for( int j=0; j<W; ++ j){
+            if( robot.field[i][j] == type ){
+                int res = ikeda::calc_distance( robot.field, {y, x}, {i, j} );
+                assert( res != 1010001000 );
+                if( res<val ){
+                    val = res;
+                    nearest_myst = make_pair( i, j );
+                }
+            }
+        }
+    }
+    if( val == 1e9 )return false;
+
+    string move_string  = ikeda::move( robot.field, {y, x}, {nearest_myst.first, nearest_myst.second} );
+
+    for( auto elm: move_string ){
+        robot.doAction( {Action( string(1, elm) )} );
+    }
+    return true;
+}
+
+bool useAllClone( Worker& robot ){
+    if( not robot.hasItem( C ) ){
+        return false;
+    }
+
+    while( robot.hasItem( C ) ){
+        int items_num = robot.countItem( C );
+
+        vector<Action> clone_actions;
+        int idle_robot_num = robot.robot_num;
+
+        for(int i=0; i<idle_robot_num; ++i ){
+            if( items_num>0 ){
+                clone_actions.push_back( Action( "C", i ) );
+                items_num--;
+            }else{
+                break;
+            }
+        }
+        assert( robot.doAction( clone_actions ) );
+    }
+    return true;
+}
 
 int main(){
     int start_y, start_x;
     string dirname = "/Users/ashibata/GitHub/icfpc2019/problems/";
     
-    for( int i=3; i<=3; ++i ){
+    for( int i=250; i<=250; ++i ){
         string filename = getFilename( i );
         
         vector<vector<Cell>> field = load_board( dirname + filename + ".desc", start_y, start_x );
         Worker robot( start_y, start_x, field );
         
+        // Find target Cell position
+        Cell target_cell = boardloader::Cloning;
         vector<pair<int,int>> items_pos;
         for( int i=0; i<robot.field.size(); ++i ){
             for( int j=0; j<robot.field[0].size(); ++ j){
-                if( robot.field[i][j] == boardloader::Cloning ){
+                if( robot.field[i][j] == target_cell ){
                     items_pos.push_back( make_pair(i, j) );
                 }
             }
         }
         
         assert( correct_items( start_y, start_x, items_pos, robot ) );
-        while( robot.hasItem( C ) ){
-            int items_num = robot.countItem( C );
-
-            vector<Action> clone_actions;
-            int idle_robot_num = robot.robot_num;
-
-            for(int i=0; i<idle_robot_num; ++i ){
-                if( items_num>0 ){
-                    clone_actions.push_back( Action( "C", i ) );
-                    items_num--;
-                }else{
-                    break;
-                }
-            }
-            assert( robot.doAction( clone_actions ) );
-            cout << string(10,'-') << endl;
-        }
+        cerr << "End correcting items" << endl;
+        assert( moveToTargetCell( robot, robot.y[0], robot.x[0], boardloader::Mysterious ) );
+        cerr << "End moving to target cell" << endl;
+        assert( useAllClone( robot ) );
+        cerr << "End using" << endl;
 
         vector<vector<bool>> occupied( field.size(), vector<bool>(field[0].size(), false) );
         occupied[robot.y[0]][robot.x[0]] = true;
-        dfs( robot, occupied );
-        
+        //dfs( robot, occupied );
+        multiDfs( robot, occupied, (1<<robot.robot_num)-1 );
+
         ofstream sol_fs( filename + ".sol" );
         robot.dump_actions( sol_fs );
         sol_fs.close();
