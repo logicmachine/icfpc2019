@@ -98,6 +98,19 @@ def download(submission_id):
     response.mimetype = 'text/plain'
     return response
 
+@app.route('/boosters/<int:submission_id>')
+def boosters(submission_id):
+    conn = get_db()
+    query = 'select problem_id, buys from solutions where id=?'
+    row = conn.execute(query, (submission_id,)).fetchone()
+    if row is None:
+        abort(404)
+    name = 'prob-{:03d}-{:05d}.buy'.format(row['problem_id'], submission_id)
+    response = make_response()
+    response.data = row['buys']
+    response.headers['Content-Disposition'] = 'attachment; filename={}'.format(name)
+    response.mimetype = 'text/plain'
+    return response
 
 @app.route('/submit', methods=['GET', 'POST'])
 def submit():
