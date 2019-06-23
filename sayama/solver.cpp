@@ -7,6 +7,7 @@
 #include <tuple>
 
 using boardloader::Cell;
+using boardloader::ItemCounter;
 using boardloader::load_board;
 using boardloader::Point;
 using boardloader::print_table;
@@ -344,10 +345,9 @@ public:
 class Worker
 {
 public:
-    Worker(Table<Cell>& table, int y, int x);
     std::vector<Action> solve();
 
-    void init(Table<Cell>& table, int y, int x);
+    void init(Table<Cell>& table, int y, int x, const ItemCounter& init_itemc_counter);
 
     Worker();
     Worker(const Worker& src);
@@ -395,6 +395,8 @@ public:
     void rotate_clockwise();
 
     void rotate_counterclockwise();
+
+    ItemCounter item_counter;
 
 private:
     void wrap();
@@ -480,7 +482,7 @@ void Worker::collect_optimal(std::vector<Point>& target_list)
     }
 }
 
-void Worker::init(Table<Cell>& table, int y, int x)
+void Worker::init(Table<Cell>& table, int y, int x, const ItemCounter& init_item_counter)
 {
     this->y = y;
     this->x = x;
@@ -507,6 +509,9 @@ void Worker::init(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(0, 1);
 
     wrap();
+
+    item_counter.reset();
+    item_counter += init_item_counter;
 
     player_direction = Direction::Right;
 }
@@ -578,6 +583,8 @@ void Worker::copy_from(const Worker& src)
 
     // action list doesn't have to share
 
+    item_counter.reset();
+
     player_direction = Direction::Right;
 }
 
@@ -600,6 +607,9 @@ bool Worker::is_empty(int cy, int cx)
 
 void Worker::attach_command()
 {
+    assert(item_counter.get(Cell::ManipulatorExtension) > 0);
+    item_counter.decrement(Cell::ManipulatorExtension);
+
     auto p = manipulator_list.back();
     Point zero(0, 0);
     auto dir = boardloader::get_direction(zero, p);
@@ -610,8 +620,10 @@ void Worker::attach_command()
 
 void Worker::clone_command()
 {
+    assert(item_counter.get(Cell::Cloning) > 0);
     assert(table[y][x] == Cell::Mysterious);
     action_list.push_back(ActionType::Cloning);
+    item_counter.decrement(Cell::Cloning);
 }
 
 void Worker::move(Direction dir)
@@ -622,6 +634,11 @@ void Worker::move(Direction dir)
     action_list.emplace_back(ActionType::Move, dir);
 
     wrap();
+
+    if (table[y][x] != Cell::Empty)
+    {
+        item_counter.increment(table[y][x]);
+    }
 }
 
 bool Worker::is_inside(int cy, int cx)
@@ -686,11 +703,6 @@ void Worker::rotate_counterclockwise()
         p.x = -py;
     }
     action_list.emplace_back(ActionType::TurnCounterClockwise);
-}
-
-Worker::Worker(Table<Cell>& table, int y, int x)
-{
-    init(table, y, x);
 }
 
 template <typename FUNCTION>
@@ -1049,7 +1061,7 @@ std::vector<Action> Worker::solve()
 class Solver
 {
 public:
-    Solver(Table<Cell> table, int start_y, int start_x);
+    Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& counter);
 
     std::vector<std::vector<Action>> solve();
 
@@ -1134,14 +1146,20 @@ void Solver::fill_obstacle(const Table<int>& cluster, Table<Cell>& table, int id
     }
 }
 
-Solver::Solver(Table<Cell> table, int start_y, int start_x)
+Solver::Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& item_counter)
 {
     worker_list.resize(1000);
-    worker_list[0].init(table, start_y, start_x);
+    worker_list[0].init(table, start_y, start_x, item_counter);
 }
 
 std::vector<std::vector<Action>> Solver::solve()
 {
+    const int manipulator_count = worker_list[0].item_counter.get(Cell::ManipulatorExtension);
+    for (int i = 0; i < manipulator_count; i++)
+    {
+        worker_list[0].attach_command();
+    }
+
     // manipulator を集めて、前にくっつける + Clone 回収
 
     std::vector<Point> clone_point = worker_list[0].gather(Cell::Cloning);
@@ -1174,7 +1192,7 @@ std::vector<std::vector<Action>> Solver::solve()
         }
         worker_list[0].collect_optimal(target_list);
 
-        const int num_clone = clone_point.size();
+        const int num_clone = clone_point.size() + worker_list[0].item_counter.get(Cell::Cloning);
 
         // Clone
         worker_size = num_clone + 1;
@@ -1257,8 +1275,17 @@ int main(int argc, char* argv[])
     int start_y, start_x;
     auto board = load_board(input_filepath, start_y, start_x);
 
-    xyzworker::Solver solver(board, start_y, start_x);
+    boardloader::ItemCounter counter;
+    counter.reset();
 
+    if (argc == 3)
+    {
+        std::string additional_booster_filepath(argv[2]);
+        auto item_list = boardloader::load_additional_booster(additional_booster_filepath);
+        counter += item_list;
+    }
+
+    xyzworker::Solver solver(board, start_y, start_x, counter);
     auto result = solver.solve();
 
     print_action(result, std::cout);

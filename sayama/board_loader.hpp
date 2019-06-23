@@ -47,6 +47,61 @@ Cell to_cell(const char ch)
     assert(false);
 }
 
+struct ItemCounter
+{
+    static constexpr int ITEMID_CLONE = 0;
+    static constexpr int ITEMID_MANIPULATOR = 1;
+    static constexpr int ITEMID_WHEEL = 2;
+    static constexpr int ITEMID_WARP = 3;
+    static constexpr int ITEMID_OTHERS = 4;
+
+    std::array<int, 5> counter;
+
+    void reset()
+    {
+        std::fill(counter.begin(), counter.end(), 0);
+    }
+
+    int to_index(Cell cell)
+    {
+        switch (cell)
+        {
+        case Cell::Cloning:
+            return ITEMID_CLONE;
+        case Cell::ManipulatorExtension:
+            return ITEMID_MANIPULATOR;
+        case Cell::FastWheels:
+            return ITEMID_WHEEL;
+        case Cell::Teleport:
+            return ITEMID_WARP;
+        }
+        return ITEMID_OTHERS;
+    }
+
+    int get(const Cell cell)
+    {
+        return counter[to_index(cell)];
+    }
+
+    void increment(const Cell cell)
+    {
+        counter[to_index(cell)]++;
+    }
+
+    void decrement(const Cell cell)
+    {
+        counter[to_index(cell)]--;
+    }
+
+    void operator+=(const ItemCounter& counter)
+    {
+        for (int i = 0; i < this->counter.size(); i++)
+        {
+            this->counter[i] += counter.counter[i];
+        }
+    }
+};
+
 template <typename T>
 using Table = std::vector<std::vector<T>>;
 
@@ -441,4 +496,21 @@ Table<Cell> load_board(const std::string& filepath, int& start_y, int& start_x)
     }
     return table;
 }
+
+ItemCounter load_additional_booster(const std::string& additional_booster_filepath)
+{
+    ItemCounter counter;
+    counter.reset();
+
+    std::string content = read_all(additional_booster_filepath);
+
+    for (auto ch : content)
+    {
+        const Cell cell = static_cast<Cell>(ch);
+        counter.increment(cell);
+    }
+
+    return counter;
+}
+
 } // namespace board
