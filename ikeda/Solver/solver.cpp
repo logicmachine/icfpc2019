@@ -1,5 +1,5 @@
-#include "../sayama/board_loader.hpp"
-#include "./ikeda.hpp"
+#include "../../sayama/board_loader.hpp"
+#include "../ikeda.hpp"
 
 #include <algorithm>
 #include <queue>
@@ -805,7 +805,7 @@ bool Worker::filled(int ly, int lx, int hy, int hx)
     for (int i = ly; i <= hy; i++) {
         for (int j = lx; j <= hx; j++) {
             if (table[i][j] != Cell::Occupied &&
-                    table[i][j] == Cell::Obstacle) {
+                    table[i][j] != Cell::Obstacle) {
                 return true;
             }
         }

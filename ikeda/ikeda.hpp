@@ -1,6 +1,10 @@
 #pragma once
 
 #include "../sayama/board_loader.hpp"
+#include <stack>
+#include <deque>
+#include <set>
+#include <string>
 
 using namespace std;
 
@@ -351,127 +355,70 @@ namespace ikeda
         return cmd;
     }
 
-    void dir_to_right(int &dir)
+    string dir_to_right(int &dir)
     {
         if (dir == 2) {
-            dir = (dir+3) % 4;
-            cout << "Q";
+            dir = 1;
+            return "Q";
         }
+        string ret;
         while (dir != 1) {
             dir = (dir+1) % 4;
-            cout << "E";
+            ret += "E";
         }
+        return ret;
     }
 
-    void dir_to_right(boardloader::Point &p, int &dir)
-    {
-        if (dir == 2) {
-            dir = (dir+3) % 4;
-            cout << "Q";
-        }
-        while (dir != 1) {
-            dir = (dir+1) % 4;
-            cout << "E";
-        }
-        paint_pos(p, dir);
-    }
-
-    void dir_to_down(int &dir)
+    string dir_to_down(int &dir)
     {
         if (dir == 3) {
-            dir = (dir+3) % 4;
-            cout << "Q";
+            dir = 2;
+            return "Q";
         }
+        string ret;
         while (dir != 2) {
             dir = (dir+1) % 4;
-            cout << "E";
+            ret += "E";
         }
+        return ret;
     }
 
-    void dir_to_down(boardloader::Point &p, int &dir)
-    {
-        if (dir == 3) {
-            dir = (dir+3) % 4;
-            cout << "Q";
-        }
-        while (dir != 2) {
-            dir = (dir+1) % 4;
-            cout << "E";
-        }
-        paint_pos(p, dir);
-    }
-
-    void dir_to_up(int &dir)
+    string dir_to_up(int &dir)
     {
         if (dir == 1) {
-            dir = (dir+3) % 4;
-            cout << "Q";
+            dir = 0;
+            return "Q";
         }
+        string ret;
         while (dir != 0) {
             dir = (dir+1) % 4;
-            cout << "E";
+            ret += "E";
         }
+        return ret;
     }
 
-    void dir_to_up(boardloader::Point &p, int &dir)
+    string move_right(boardloader::Point &p)
     {
-        if (dir == 1) {
-            dir = (dir+3) % 4;
-            cout << "Q";
-        }
-        while (dir != 0) {
-            dir = (dir+1) % 4;
-            cout << "E";
-        }
-        paint_pos(p, dir);
-    }
-
-    void move_right(boardloader::Point &p)
-    {
-        cout << "D";
         p.x++;
+        return "D";
     }
 
-    void move_right(boardloader::Point &p, int dir)
+    string move_left(boardloader::Point &p)
     {
-        move_right(p);
-        paint_pos(p, dir);
-    }
-
-    void move_left(boardloader::Point &p)
-    {
-        cout << "A";
         p.x--;
+        return "A";
     }
 
-    void move_left(boardloader::Point &p, int dir)
+    string move_down(boardloader::Point &p)
     {
-        move_left(p);
-        paint_pos(p, dir);
-    }
-
-    void move_down(boardloader::Point &p)
-    {
-        cout << "S";
         p.y--;
+        return "S";
     }
-
-    void move_down(boardloader::Point &p, int dir)
+    
+    string move_up(boardloader::Point &p)
     {
-        move_down(p);
-        paint_pos(p, dir);
-    }
-
-    void move_up(boardloader::Point &p)
-    {
-        cout << "W";
         p.y++;
-    }
-
-    void move_up(boardloader::Point &p, int dir)
-    {
-        move_up(p);
-        paint_pos(p, dir);
+        return "W";
     }
 
     void paint_string(boardloader::Point &st, int dir, const string &cmd)
@@ -507,71 +454,58 @@ namespace ikeda
         }
     }
 
-    void paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
+    string paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
     {
-        if (filled(block)) {
-            //cout << "filled!" << endl;
-            return;
-        } else {
-            //cout << "block : " << block.small << " " << block.large << endl;
-        }
-        dir_to_right(p, dir);
+        string ret;
         bool fl = false;
-        if ((block.large.x - block.small.x + 1) > 1) move_right(p, dir);
+        if ((block.large.x - block.small.x + 1) > 1) {
+            ret += move_right(p);
+        }
         for (int j = 0; j < (block.large.x - block.small.x + 1) / 6; j++) {
             fl = true;
             if (j) {
-                move_right(p, dir);
-                move_right(p, dir);
-                move_right(p, dir);
+                ret += move_right(p);
+                ret += move_right(p);
+                ret += move_right(p);
             }
-            dir_to_up(p, dir);
+            ret += dir_to_up(dir);
             for (int i = block.small.y; i < block.large.y; i++) {
-                move_up(p, dir);
+                ret += move_up(p);
             }
-            dir_to_right(p, dir);
-            move_right(p, dir);
-            move_right(p, dir);
-            move_right(p, dir);
-            dir_to_down(p, dir);
+            ret += dir_to_right(dir);
+            ret += move_right(p);
+            ret += move_right(p);
+            ret += move_right(p);
+            ret += dir_to_down(dir);
             for (int i = block.small.y; i < block.large.y; i++) {
-                move_down(p, dir);
+                ret += move_down(p);
             }
-            dir_to_right(p, dir);
+            ret += dir_to_right(dir);
         }
-        if ((block.large.x - block.small.x + 1) % 6 >= 4) {
+        if ((block.large.x - block.small.x + 1) % 6 != 0) {
             if (fl) {
-                move_right(p, dir);
-                move_right(p, dir);
-                move_right(p, dir);
-            }
-            fl = true;
-            dir_to_up(p, dir);
-            for (int i = block.small.y; i < block.large.y; i++) {
-                move_up(p, dir);
-            }
-            dir_to_right(p, dir);
-            for (int i = 0; i < (block.large.x - block.small.x + 1) % 3; i++) {
-                move_right(p, dir);
-            }
-            dir_to_down(p, dir);
-            for (int i = block.small.y; i < block.large.y; i++) {
-                move_down(p, dir);
-            }
-            dir_to_right(p, dir);
-        } else if ((block.large.x - block.small.x + 1) % 6 >= 1) {
-            if (fl) {
-                for (int i = 0; i < (block.large.x - block.small.x + 1) % 3 + 1; i++) {
-                    move_right(p, dir);
+                ret += move_right(p);
+                ret += move_right(p);
+                if ((block.large.x - block.small.x + 1) % 6 != 1) {
+                    ret += move_right(p);
                 }
             }
             fl = true;
-            //cout << "dir : " << dir << endl;
-            dir_to_up(p, dir);
+            ret += dir_to_up(dir);
             for (int i = block.small.y; i < block.large.y; i++) {
-                move_up(p, dir);
+                ret += move_up(p);
+            }
+            ret += dir_to_right(dir);
+        }
+        if ((block.large.x - block.small.x + 1) % 6 >= 4) {
+            ret += move_right(p);
+            ret += move_right(p);
+            ret += dir_to_down(dir);
+            for (int i = block.small.y; i < block.large.y; i++) {
+                ret += move_down(p);
             }
         }
+        return ret;
     }
 
     void get_edge(vector<string> &data, vector<vector<int>> &tate, vector<vector<int>> &yoko)
