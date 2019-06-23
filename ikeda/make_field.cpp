@@ -187,10 +187,6 @@ int main(int argc, char* argv[]){
         assert( elm.y<H );
         assert( elm.x<W );
         ikeda::connect(field, stliSqs, {elm.y, elm.x});
-        //cout << elm.y << " " << elm.x << endl;
-    }
-    for (int i = 0; i < field.size(); i++) {
-    //    cout << field[i] << endl;
     }
 
         while(1){
