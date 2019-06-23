@@ -9,8 +9,8 @@ API_SERVER = 'http://icfpc.logicmachine.jp:5000'
 
 def process(info):
     author = info['author']
-    if author.find('+popt') >= 0:
-        return
+    # if author.find('+popt') >= 0:
+    #     return
     problem = requests.get('{}/problems/{}'.format(API_SERVER, info['problem_id'])).text
     solution = requests.get('{}/download/{}'.format(API_SERVER, info['submission_id'])).text
     with NamedTemporaryFile() as pf, NamedTemporaryFile() as sf:
