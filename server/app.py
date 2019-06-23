@@ -4,7 +4,7 @@ import requests
 from tempfile import TemporaryFile
 from zipfile import ZipFile
 
-from flask import Flask, g, request, render_template, make_response, abort
+from flask import Flask, g, request, render_template, make_response, abort, jsonify
 
 app = Flask(__name__)
 
@@ -34,6 +34,34 @@ def index():
         for row in conn.execute(query)
     ]
     return render_template('index.html', problems=problems)
+
+@app.route('/index.json')
+def index_json():
+    conn = get_db()
+    query = '''
+    select solutions.id, problem_id, min(score), author, created_at
+      from solutions
+      inner join problems on problem_id = problems.id
+      group by problem_id
+    '''
+    problems = [
+        {
+            'problem_id': row['problem_id'],
+            'submission_id': row['id'],
+            'score': row['min(score)'],
+            'author': row['author'],
+            'created_at': row['created_at']
+        }
+        for row in conn.execute(query)
+    ]
+    return jsonify(problems)
+
+@app.route('/problems/<int:problem_id>')
+def problem(problem_id):
+    conn = get_db()
+    query = 'select content from problems where id=?'
+    row = conn.execute(query, (problem_id,)).fetchone()
+    return row['content']
 
 @app.route('/details/<int:problem_id>')
 def details(problem_id):

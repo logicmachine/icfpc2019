@@ -443,6 +443,8 @@ void Worker::init(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(1, 1);
     manipulator_list.emplace_back(-1, 1);
     manipulator_list.emplace_back(0, 1);
+
+    wrap();
 }
 
 std::vector<Action>& Worker::get_action_list()
@@ -550,6 +552,7 @@ void Worker::move(Direction dir)
     y += dy[index];
     x += dx[index];
     action_list.emplace_back(ActionType::Move, dir);
+    // wrap();
 }
 
 bool Worker::is_inside(int cy, int cx)
@@ -778,7 +781,6 @@ void Worker::dfs_with_restart()
 
     while (true)
     {
-        table[y][x] = Cell::Occupied;
         wrap();
 
         if (!reset_to_small_region())
@@ -924,6 +926,7 @@ std::vector<std::vector<Action>> Solver::solve()
 
     std::vector<Point> clone_point = worker_list[0].gather(Cell::Cloning);
     std::vector<Point> manipulator_point = worker_list[0].gather(Cell::ManipulatorExtension);
+    std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
 
     std::vector<Point> target_list;
     for (auto& p : clone_point)
@@ -956,29 +959,29 @@ std::vector<std::vector<Action>> Solver::solve()
         // Clone
         worker_size = num_clone + 1;
 
-        std::vector<Point> mysterious_point = worker_list[0].gather(Cell::Mysterious);
-
         // Clustering の結果を収集
-
-        std::vector<Point> base_point_list = generate_base_point_list(worker_list[0], num_clone + 1);
-
-        Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), base_point_list);
-
-        const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
-        worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
-
-        for (int i = 1; i <= num_clone; i++)
+        if (num_clone > 0)
         {
-            worker_list[i].copy_from(worker_list[0]);
-            worker_list[0].clone_command();
+            std::vector<Point> base_point_list = generate_base_point_list(worker_list[0], num_clone + 1);
 
-            worker_list[i].bfs_move([&](Point& p) { return p == base_point_list[i]; });
-            fill_obstacle(clustering_result, worker_list[i].get_table(), i);
-            worker_list[i].dfs_with_restart();
+            Table<int> clustering_result = cluster.clustering_by_bfs(worker_list[0].get_table(), base_point_list);
+
+            const int nearest_mysterious = worker_list[0].select_shortest(mysterious_point);
+            worker_list[0].bfs_move([&](Point& p) { return p == mysterious_point[nearest_mysterious]; });
+
+            for (int i = 1; i <= num_clone; i++)
+            {
+                worker_list[i].copy_from(worker_list[0]);
+                worker_list[0].clone_command();
+
+                worker_list[i].bfs_move([&](Point& p) { return p == base_point_list[i]; });
+                fill_obstacle(clustering_result, worker_list[i].get_table(), i);
+                worker_list[i].dfs_with_restart();
+            }
+
+            worker_list[0].bfs_move([&](Point& p) { return p == base_point_list[0]; });
+            fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
         }
-
-        worker_list[0].bfs_move([&](Point& p) { return p == base_point_list[0]; });
-        fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
         worker_list[0].dfs_with_restart();
     }
 

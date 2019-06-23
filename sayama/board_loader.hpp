@@ -397,11 +397,16 @@ Table<Cell> load_board(const std::string& filepath, int& start_y, int& start_x)
     Point min_point, max_point;
     std::tie(min_point, max_point) = calculate_map_edge(maps);
 
+    for (auto& v : maps)
+    {
+        v -= min_point;
+    }
+
     Table<Cell> table;
-    table.resize(max_point.y - min_point.y);
+    table.resize(max_point.y);
     for (auto& row : table)
     {
-        row.resize(max_point.x - min_point.x, Cell::Obstacle);
+        row.resize(max_point.x, Cell::Obstacle);
     }
 
     fill(table, maps, Cell::Empty);
