@@ -186,6 +186,8 @@ private:
     void get_ccl_data(const std::vector<std::vector<Cell>>& table, std::vector<int>& data, int& W);
     void calc_ccl(std::vector<int>& data, const int W, std::vector<int>& result, vector<int>& spaces);
     void check_ccl(const std::vector<std::vector<Cell>>& table, vector<int>& result, vector<int>& spaces);
+    Point nearest_cc(int y, int x);
+    Point largest_cc(int y, int x);
 
     bool is_inside(int cy, int cx);
 
@@ -319,7 +321,7 @@ void Worker::get_ccl_data(const std::vector<std::vector<Cell>>& table, std::vect
     //vector<int> data;
     for (const auto& xs : table) {
         for (const auto& x : xs) {
-            data.push_back(x == Cell::Obstacle ? 1 : 0);
+            data.push_back((x == Cell::Obstacle || x == Cell::Occupied) ? 1 : 0);
         }
     }
 }
@@ -329,8 +331,6 @@ void Worker::calc_ccl(std::vector<int>& data, const int W, std::vector<int>& res
 	//std::vector<int> result(ccl.ccl(data, W));
     result = ccl.ccl(data, W);
 
-	std::cerr << "Size: " << result.size() << std::endl; /// number of pixels
-	std::cerr << "Width: " << W << std::endl; /// width
     //std::vector<int> memo;
 	for (int i = 0; i < static_cast<int>(result.size()) / W; i++) {
 		for (int j = 0; j < W; j++) {
@@ -339,10 +339,6 @@ void Worker::calc_ccl(std::vector<int>& data, const int W, std::vector<int>& res
             }
         }
 	}
-    for (auto space : spaces) {
-        std::cerr << space << " ";
-    }
-    std::cerr << std::endl;
 }
 
 //void Worker::check_ccl(const std::vector<std::vector<Cell>>& table, std::vector<int>& data, int& W, vector<int>& result, vector<int>& spaces)
@@ -354,6 +350,19 @@ void Worker::check_ccl(const std::vector<std::vector<Cell>>& table, vector<int>&
     spaces.clear();
     get_ccl_data(table, data, W);
     calc_ccl(data, W, result, spaces);
+
+	//std::cerr << "Size: " << result.size() << std::endl; /// number of pixels
+	//std::cerr << "Width: " << W << std::endl; /// width
+
+#if 0
+    std::cerr << "conncted components: ";
+    for (auto space : spaces) {
+        std::cerr << space << " ";
+    }
+    std::cerr << std::endl;
+#endif
+    ///std::cerr << "number of conncted components: " << spaces.size() << std::endl;
+
 }
 
 Worker::Worker(Table<Cell>& table, int y, int x)
@@ -364,6 +373,9 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     // Up, Left, Down, Right
     dy = { 1, 0, -1, 0 };
     dx = { 0, -1, 0, 1 };
+    // Left, Up, Down, Right
+    //dy = { 0, 1, -1, 0 };
+    //dx = { -1, 0, 0, 1 };
 
     /*
     manipulator_list.emplace_back(0, 0);
@@ -376,41 +388,7 @@ Worker::Worker(Table<Cell>& table, int y, int x)
     manipulator_list.emplace_back(-1, 1);
     manipulator_list.emplace_back(0, 1);
 
-    /// CCL
-    //int W;
-    //vector<int> data;
-    /*
-    int W = table[0].size();
-    vector<int> data;
-    for (const auto& xs : table) {
-        for (const auto& x : xs) {
-            data.push_back(x == Cell::Obstacle ? 1 : 0);
-        }
-    }
-    */
-    //std::vector<int> result;
-    //std::vector<int> spaces;
     check_ccl(table, ccl_data, ccl_spaces);
-    //get_ccl_data(table, data, W);
-    //calc_ccl(data, W, result, spaces);
-
-    /*
-	std::vector<int> result(ccl.ccl(data, W));
-
-	std::cerr << "Size: " << result.size() << std::endl; /// number of pixels
-	std::cerr << "Width: " << W << std::endl; /// width
-    std::vector<int> memo;
-	for (int i = 0; i < static_cast<int>(result.size()) / W; i++) {
-		for (int j = 0; j < W; j++) {
-            if (data[i*W+j] == 0 && find(memo.begin(), memo.end(), result[i*W+j]) == memo.end()) {
-                memo.push_back(result[i*W+j]);
-            }
-        }
-	}
-    for (auto x : memo) {
-        std::cerr << x << std::endl;
-    }
-    */
 }
 
 bool Worker::bfs()
@@ -477,6 +455,125 @@ int Worker::get_empty_neighrbor_cell(int cy, int cx)
     return count;
 }
 
+//Point Worker::nearest_cc(const std::vector<std::vector<Cell>>& table)
+Point Worker::nearest_cc(int y, int x)
+{
+    int max_check_count = 10;
+
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
+
+    std::vector<Point> area;
+    int H = table.size();
+    int W = table[0].size();
+    unsigned int next_dist = -1;
+    Point next_pos({-1, -1});
+    for (const auto& space : ccl_spaces) {
+        area.clear();
+        for (int i = 0; i < ccl_data.size(); i++) {
+            if (ccl_data[i] == space) {
+                //area.push_back(Point(H - i / W - 1, i % W));
+                area.push_back(Point(i / W, i % W));
+            }
+        }
+        std::shuffle(area.begin(), area.end(), engine);
+#if 0
+        Point max_x_pos, max_y_pos, min_x_pos, min_y_pos;
+        unsigned int max_x = 0;
+        unsigned int max_y = 0;
+        unsigned int min_x = -1;
+        unsigned int min_y = -1;
+        for (const auto& pos : area) {
+            if (max_x < pos.x) {
+                max_x = pos.x;
+                max_x_pos = pos;
+            }
+            if (max_y < pos.y) {
+                max_y = pos.y;
+                max_y_pos = pos;
+            }
+            if (min_x > pos.x) {
+                min_x = pos.x;
+                min_x_pos = pos;
+            }
+            if (min_y > pos.y) {
+                min_y = pos.x;
+                min_y_pos = pos;
+            }
+        }
+        std::vector<Point> candidates;
+        candidates.push_back(max_x_pos);
+        candidates.push_back(max_y_pos);
+        candidates.push_back(min_x_pos);
+        candidates.push_back(min_y_pos);
+#endif
+        int cnt = 0;
+        unsigned int longest_dist = 0;
+        unsigned int nearest_dist = -1;
+        Point longest_pos;
+        Point nearest_pos;
+        for (const Point& pos : area) {
+        //for (const Point& pos : candidates) {
+            unsigned int dist = ikeda::calc_distance(table, {y, x}, {pos.y, pos.x});
+            if (longest_dist < dist) {
+                longest_dist = dist;
+                longest_pos = pos;
+            }
+            if (nearest_dist > dist) {
+                nearest_dist = dist;
+                nearest_pos = pos;
+            }
+            if (cnt++ > max_check_count) break;
+        }
+        //if (next_dist > longest_dist) {
+        if (next_dist > nearest_dist) {
+            //next_dist = longest_dist;
+            //next_pos = longest_pos;
+            next_dist = nearest_dist;
+            next_pos = nearest_pos;
+        }
+    }
+
+    return next_pos;
+}
+
+Point Worker::largest_cc(int y, int x)
+{
+    std::random_device seed_gen;
+    std::mt19937 engine(seed_gen());
+
+    std::vector<Point> area;
+    int H = table.size();
+    int W = table[0].size();
+    //unsigned int next_dist = -1;
+    Point next_pos({-1, -1});
+    unsigned int max_ccl_size = 0;
+    unsigned int min_ccl_size = -1;
+
+    for (const auto& space : ccl_spaces) {
+        int ccl_size = count(ccl_data.begin(), ccl_data.end(), space);
+#if 0
+        if (max_ccl_size < ccl_size) {
+            max_ccl_size = ccl_size;
+#else
+        if (min_ccl_size > ccl_size) {
+            min_ccl_size = ccl_size;
+#endif
+            area.clear();
+            for (int i = 0; i < ccl_data.size(); i++) {
+                if (ccl_data[i] == space) {
+                    //area.push_back(Point(H - i / W - 1, i % W));
+                    area.push_back(Point(i / W, i % W));
+                }
+            }
+            std::shuffle(area.begin(), area.end(), engine);
+            next_pos = area.front();
+        }
+    }
+
+    return next_pos;
+}
+
 void Worker::dfs_with_restart()
 {
     std::vector<std::pair<int, Direction>> selected;
@@ -502,6 +599,8 @@ void Worker::dfs_with_restart()
         wrap();
 #endif
 
+        //check_ccl(table, ccl_data, ccl_spaces); ////// debug
+
         selected.clear();
 
         for (int i = 0; i < 4; i++)
@@ -511,19 +610,34 @@ void Worker::dfs_with_restart()
             if (is_inside(ny, nx) && table[ny][nx] == Cell::Empty)
             {
                 const Direction dir = static_cast<Direction>(i);
-                selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
+                //selected.emplace_back(-get_empty_neighrbor_cell(ny, nx), dir);
+                selected.emplace_back(dy[i], dir); /// debug
             }
         }
         if (selected.empty())
         {
+#if 1
+            check_ccl(table, ccl_data, ccl_spaces); ////// debug
+            Point next_pos(nearest_cc(y, x));
+            //Point next_pos(largest_cc(y, x));
+            ///std::cerr << "next_pos: " << next_pos.x << ", " << next_pos.y << std::endl;
+            if (next_pos.x == -1) break;
+            std::string move_string = ikeda::move(table, {y, x}, {next_pos.y, next_pos.x});
+            for (char a : move_string) {
+                move(get_move_direction(a));
+                wrap();
+            }
+#else
             if (!bfs())
             {
                 break;
             }
+#endif
         }
         else
         {
             sort(selected.begin(), selected.end());
+            //sort(selected.begin(), selected.end(), std::greater<std::pair<int, Direction>>());
             move(selected[0].second);
         }
     }
@@ -651,10 +765,14 @@ int main(int argc, char* argv[])
     int start_y, start_x;
     auto board = load_board(input_filepath, start_y, start_x);
 
+    for (int i = 0; i < 10; i++) {
     xyzworker::Worker worker(board, start_y, start_x);
 
     auto result = worker.solve();
 
+    std::cerr << "Size: " << result.size() << std::endl; ///// debug
+    
     //save_action(result, output_filepath);
     output_action(result);
+    }
 }
