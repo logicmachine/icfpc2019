@@ -1154,6 +1154,8 @@ Solver::Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& item_co
 
 std::vector<std::vector<Action>> Solver::solve()
 {
+    // manipulator / clone しか使えない前提
+
     const int manipulator_count = worker_list[0].item_counter.get(Cell::ManipulatorExtension);
     for (int i = 0; i < manipulator_count; i++)
     {
@@ -1192,7 +1194,7 @@ std::vector<std::vector<Action>> Solver::solve()
         }
         worker_list[0].collect_optimal(target_list);
 
-        const int num_clone = clone_point.size() + worker_list[0].item_counter.get(Cell::Cloning);
+        const int num_clone = worker_list[0].item_counter.get(Cell::Cloning);
 
         // Clone
         worker_size = num_clone + 1;
