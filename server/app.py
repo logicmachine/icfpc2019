@@ -56,6 +56,13 @@ def index_json():
     ]
     return jsonify(problems)
 
+@app.route('/problems/<int:problem_id>')
+def problem(problem_id):
+    conn = get_db()
+    query = 'select content from problems where id=?'
+    row = conn.execute(query, (problem_id,)).fetchone()
+    return row['content']
+
 @app.route('/details/<int:problem_id>')
 def details(problem_id):
     conn = get_db()
