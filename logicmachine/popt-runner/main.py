@@ -24,7 +24,7 @@ def get_submissions(problem_id):
             continue
         prefix = re.match(r'[a-zA-Z]+', s['author']).group(0)
         if prefix in submissions:
-            pass
+            break
         submissions[prefix] = {
             'problem_id': problem_id,
             'submission_id': s['id'],
@@ -58,7 +58,7 @@ def process(info):
                 '{}/submit'.format(API_SERVER),
                 {
                     'problem_id': problem_id,
-                    'author': author + '+popt9',
+                    'author': author + '+popt10',
                     'solution': solution,
                     'boosters': boosters
                 })
