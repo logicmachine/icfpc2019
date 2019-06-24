@@ -9,13 +9,13 @@ const int manip_x[] = {1, 1, 1};
 
 class Worker{
     int H, W;
-    vector<vector<pair<int,int>>> manipulators_;
     vector<Direction> dir_;
     vector<int> speed_;
     
-    map<Item,int> items_;    
     
 public:
+    map<Item,int> items_;    
+    vector<vector<pair<int,int>>> manipulators_;
     int robot_num;
     vector<int> y, x;
     vector<vector<Action>> action_log;
@@ -251,6 +251,34 @@ public:
             }else if( act.opcode == "B" ){ // attach B
                 assert( act.operand.first  == -1 );
                 assert( act.operand.second == -1 );
+                assert( act.user_num != -1 );
+
+                if( not hasItem( B ) ){
+                    return false;
+                }
+
+                int dy[] = {0, -1, 0, 1};
+                int dx[] = {1, 0, -1, 0};
+                assert( act.user_num < manipulators_.size() );
+                set<pair<int,int>> theManip;
+                for( auto elm: manipulators_[act.user_num] ){
+                    theManip.insert( elm );
+                }
+
+                bool adj = false;
+                for( int k=0; k<4; ++k ){
+                    if( theManip.count( act.operand ) != 0 ){
+                        adj = true;
+                    }
+                }
+                if( adj == false ){
+                    cerr << "should be adjacent";
+                }
+                assert( adj == true );
+                assert( items_[B]>0 );
+                items_[B]--;
+                manipulators_[act.user_num].push_back( act.operand );
+
                 warning( "Not implemented" );
                 return false;
                 

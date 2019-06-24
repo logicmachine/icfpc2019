@@ -39,5 +39,6 @@ public:
     Action( string opc ): opcode(opc) { operand = make_pair( -1, -1 ); }
     Action( string opc, pair<int,int> oper ): opcode(opc), operand(oper) {}
     Action( string opc, int num ): opcode(opc), user_num(num) { operand = make_pair( -1, -1 ); }
+    Action( string opc, pair<int,int> oper, int num ): opcode(opc), operand(oper), user_num(num) {}
     
 };
