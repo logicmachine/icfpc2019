@@ -1317,6 +1317,52 @@ std::vector<Point> Worker::select_optimize_region()
 
         auto target_point_list = get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 20);
 
+        std::vector<Cell> recur;
+        for (auto& v : target_point_list)
+        {
+            recur.push_back(table[v.y][v.x]);
+        }
+
+        for (auto& v : target_point_list)
+        {
+            table[v.y][v.x] = Cell::Obstacle;
+        }
+
+        std::vector<Point> additional;
+
+        // 細かい点をついでに集める
+        for (auto& p : target_point_list)
+        {
+            using Metric = ManhattanNeighbor;
+            for (int k = 0; k < Metric::size; k++)
+            {
+                const int ny = p.y + Metric::dy[k];
+                const int nx = p.x + Metric::dx[k];
+                if (is_inside(ny, nx) && is_empty(ny, nx))
+                {
+                    constexpr int upperbound = 20;
+                    auto cand = get_empty_connected_cell(ny, nx, upperbound);
+                    if (cand.size() < upperbound)
+                    {
+                        for (auto& v : cand)
+                        {
+                            additional.push_back(v);
+                        }
+                    }
+                }
+            }
+        }
+        for (auto& v : additional)
+        {
+            target_point_list.push_back(v);
+        }
+
+        for (int i = 0; i < recur.size(); i++)
+        {
+            const auto& p = target_point_list[i];
+            table[p.y][p.x] = recur[i];
+        }
+
         // if not empty
         if (!target_point_list.empty())
         {
@@ -1348,7 +1394,7 @@ void Worker::divide_and_search()
         }
 
         std::vector<Action> action_list;
-        beam_search(this, 100, 3000, region_to_optimize, action_list);
+        beam_search(this, 100, 5000, region_to_optimize, action_list);
 
         // apply
         for (auto& action : action_list)
