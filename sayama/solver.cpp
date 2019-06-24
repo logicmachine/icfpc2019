@@ -858,6 +858,9 @@ void Worker::move(Direction dir)
     y += ManhattanNeighbor::dy[index];
     x += ManhattanNeighbor::dx[index];
 
+    assert(is_inside(y, x));
+    assert(table[y][x] != Cell::Obstacle);
+
     action_list.emplace_back(ActionType::Move, dir);
 
     _hash ^= player_hash_table[y][x];
@@ -941,9 +944,10 @@ void Worker::unwrap()
 
 void Worker::unrotate_clockwise()
 {
-    _hash -= static_cast<std::uint64_t>(player_direction);
-    player_direction = counter_clockwise(player_direction);
-    _hash += static_cast<std::uint64_t>(player_direction);
+    action_list.pop_back();
+
+    unwrap();
+
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -951,14 +955,16 @@ void Worker::unrotate_clockwise()
         p.y = px;
         p.x = -py;
     }
-    action_list.pop_back();
+    _hash -= static_cast<std::uint64_t>(player_direction);
+    player_direction = counter_clockwise(player_direction);
+    _hash += static_cast<std::uint64_t>(player_direction);
 }
 
 void Worker::unrotate_counterclockwise()
 {
-    _hash -= static_cast<std::uint64_t>(player_direction);
-    player_direction = clockwise(player_direction);
-    _hash += static_cast<std::uint64_t>(player_direction);
+    action_list.pop_back();
+
+    unwrap();
 
     for (auto& p : manipulator_list)
     {
@@ -967,7 +973,10 @@ void Worker::unrotate_counterclockwise()
         p.y = -px;
         p.x = py;
     }
-    action_list.pop_back();
+
+    _hash -= static_cast<std::uint64_t>(player_direction);
+    player_direction = clockwise(player_direction);
+    _hash += static_cast<std::uint64_t>(player_direction);
 }
 
 void Worker::rotate_clockwise()
@@ -983,6 +992,9 @@ void Worker::rotate_clockwise()
         p.y = -px;
         p.x = py;
     }
+
+    wrap();
+
     action_list.emplace_back(ActionType::TurnClockwise);
 }
 
@@ -999,6 +1011,9 @@ void Worker::rotate_counterclockwise()
         p.y = px;
         p.x = -py;
     }
+
+    wrap();
+
     action_list.emplace_back(ActionType::TurnCounterClockwise);
 }
 
@@ -1298,10 +1313,9 @@ std::vector<Point> Worker::select_optimize_region()
     const bool has_empty = bfs_move([&](Point& p) { return is_empty(p.y, p.x); }).size() > 0;
     if (has_empty)
     {
-
         auto empty_nearest = bfs_move_point([&](Point& p) { return is_empty(p.y, p.x); });
 
-        auto target_point_list = get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 40);
+        auto target_point_list = get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 20);
 
         // if not empty
         if (!target_point_list.empty())
@@ -1509,25 +1523,24 @@ void beam_search(Worker* init, int max_turn, int beam_width, const std::vector<P
                         // 全部見つかった
                         if (eval == point_to_optimize.size())
                         {
+                            action_list.clear();
                             for (auto& v : temp.get_action_list())
                             {
                                 action_list.push_back(v);
                             }
-                            std::vector<std::vector<Action>> ret;
-                            ret.push_back(action_list);
                             return;
                         }
 
-                        // if (best_eval < eval || turn < min_turn)
-                        // {
-                        //     best_eval = eval;
-                        //     min_turn = turn;
-                        //     action_list.clear();
-                        //     for (auto& v : temp.get_action_list())
-                        //     {
-                        //         action_list.push_back(v);
-                        //     }
-                        // }
+                        if (best_eval < eval || turn < min_turn)
+                        {
+                            best_eval = eval;
+                            min_turn = turn;
+                            action_list.clear();
+                            for (auto& v : temp.get_action_list())
+                            {
+                                action_list.push_back(v);
+                            }
+                        }
 
                         state_list.emplace_back(-eval, WorkerDiff(worker_id, action, mt));
                         hash_set.insert(hash);
