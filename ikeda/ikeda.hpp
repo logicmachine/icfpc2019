@@ -457,6 +457,7 @@ namespace ikeda
     string paint(vector<vector<boardloader::Cell>> &board, Block &block, boardloader::Point &p, int &dir)
     {
         string ret;
+        ret += dir_to_right(dir);
         bool fl = false;
         if ((block.large.x - block.small.x + 1) > 1) {
             ret += move_right(p);
