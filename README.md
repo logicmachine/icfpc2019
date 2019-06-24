@@ -4,15 +4,15 @@
 
 ### Team
 
-fixstars
+* fixstars
 
 ### Members
 
-Noriyuki Futatsugi (futatsugi)
-Takaaki Hiragushi (logicmachine)
-Yuichi Sayama (sayama)
-Atsuya Shibata (ashiba)
-Tatsuya Ikeda (ikeda)
+* Noriyuki Futatsugi (futatsugi)
+* Takaaki Hiragushi (logicmachine)
+* Yuichi Sayama (sayama)
+* Atsuya Shibata (ashiba)
+* Tatsuya Ikeda (ikeda)
 
 ## Build
 
