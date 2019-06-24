@@ -1,6 +1,7 @@
 #include "board_loader.hpp"
 
 #include <algorithm>
+#include <memory>
 #include <queue>
 #include <random>
 #include <stack>
@@ -282,6 +283,7 @@ enum class ActionType
     Drill,
     Cloning,
     Teleport,
+    NearestMove,
 };
 
 struct Action
@@ -343,7 +345,9 @@ public:
     }
 };
 
-class BeamSearcher;
+class Worker;
+
+std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width);
 
 class Worker
 {
@@ -357,6 +361,7 @@ public:
     Worker();
     Worker(const Worker& src);
     void copy_from(const Worker& src);
+    void copy_from_complete(const Worker& src);
 
     void apply(Action& action);
     void undo(Action& action);
@@ -422,7 +427,7 @@ private:
 
     bool is_inside(int cy, int cx);
 
-    bool should_rotate_clockwise(Direction dir, int length);
+    int should_rotate_clockwise(Direction dir, int length);
 
     int count_pass_empty(const Point& base, Direction move_dir, int move_length, Direction side_dir, int side_length);
 
@@ -449,8 +454,6 @@ private:
     std::vector<Point> manipulator_list;
 
     std::vector<Action> action_list;
-
-    // BeamSearcher* beam_search;
 };
 
 void Worker::apply(Action& action)
@@ -487,7 +490,6 @@ void Worker::undo(Action& action)
 
 Worker::~Worker()
 {
-    // delete beam_search;
 }
 
 int Worker::select_shortest(std::vector<Point>& target_list)
@@ -568,8 +570,6 @@ void Worker::init(Table<Cell>& table, int y, int x, const ItemCounter& init_item
     item_counter += init_item_counter;
 
     player_direction = Direction::Right;
-
-    // beam_search = new BeamSearcher;
 }
 
 std::vector<Action>& Worker::get_action_list()
@@ -603,6 +603,53 @@ std::vector<Point> Worker::gather_with(FUNCTION condition)
         }
     }
     return ret;
+}
+
+void Worker::copy_from_complete(const Worker& src)
+{
+    // table
+    table.resize(src.table.size());
+    for (auto& row : table)
+    {
+        row.resize(src.width());
+    }
+
+    occupied.resize(height());
+    for (auto& row : occupied)
+    {
+        row.resize(width(), 0);
+    }
+
+    for (int i = 0; i < height(); i++)
+    {
+        for (int j = 0; j < width(); j++)
+        {
+            table[i][j] = src.table[i][j];
+            occupied[i][j] = src.occupied[i][j];
+        }
+    }
+
+    y = src.y;
+    x = src.x;
+
+    player_direction = src.player_direction;
+
+    manipulator_list.clear();
+    for (auto& p : src.manipulator_list)
+    {
+        manipulator_list.push_back(p);
+    }
+
+    // action list doesn't have to share
+
+    item_counter.reset();
+    item_counter += src.item_counter;
+
+    action_list.clear();
+    for (auto& action : src.action_list)
+    {
+        action_list.push_back(action);
+    }
 }
 
 void Worker::copy_from(const Worker& src)
@@ -642,8 +689,6 @@ void Worker::copy_from(const Worker& src)
     item_counter.reset();
 
     player_direction = Direction::Right;
-
-    // beam_search = new BeamSearcher;
 }
 
 Worker::Worker(const Worker& src)
@@ -895,13 +940,26 @@ int Worker::count_pass_empty(const Point& base, Direction move_dir, int move_len
     return count;
 }
 
-bool Worker::should_rotate_clockwise(Direction move_dir, int move_length)
+int Worker::should_rotate_clockwise(Direction move_dir, int move_length)
 {
     Point current(y, x);
     const int side_length = manipulator_list.size() - 3;
 
     const int eval_clockwise = count_pass_empty(current, move_dir, move_length, clockwise(player_direction), side_length);
     const int eval_counterclockwise = count_pass_empty(current, move_dir, move_length, counter_clockwise(player_direction), side_length);
+
+    if (eval_clockwise == 0 && eval_counterclockwise == 0)
+    {
+        return 0;
+    }
+    else if (eval_clockwise > eval_counterclockwise)
+    {
+        return 1;
+    }
+    else
+    {
+        return -1;
+    }
 
     return eval_clockwise > eval_counterclockwise;
 }
@@ -922,11 +980,12 @@ void Worker::generate_move_sequence(const std::vector<Direction>& move_list)
             {
                 if (!is_orthogonal(player_direction, move_list[begin]))
                 {
-                    if (should_rotate_clockwise(move_list[begin], index - begin))
+                    int judge = should_rotate_clockwise(move_list[begin], index - begin);
+                    if (judge > 0)
                     {
                         rotate_clockwise();
                     }
-                    else
+                    else if (judge < 0)
                     {
                         rotate_counterclockwise();
                     }
@@ -1108,14 +1167,17 @@ bool Worker::reset_to_small_region()
 std::vector<Point> Worker::select_optimize_region()
 {
     auto empty_nearest = bfs_move_point([&](Point& p) { return is_empty(p.y, p.x); });
-    // max size of beam search
-    return get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 40);
+
+    auto target_point_list = get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 40);
 
     // if not empty
-    if (!is_empty(y, x))
+    if (!target_point_list.empty())
     {
         bfs_move_with_move([&](Point& p) { return p == empty_nearest; });
     }
+
+    // max size of beam search
+    return target_point_list;
 }
 
 void Worker::divide_and_search()
@@ -1127,10 +1189,12 @@ void Worker::divide_and_search()
         // select_region_to_optimize();
         std::vector<Point> region_to_optimize = select_optimize_region();
 
-        // beam_search->init(*this, 3000);
+        if (region_to_optimize.empty())
+        {
+            break;
+        }
 
-        // beam_search
-        // auto action_list = beam_search->doit();
+        auto action_list = beam_search(this, 100, 3000);
 
         // apply
         for (auto& action : action_list)
@@ -1206,32 +1270,41 @@ std::vector<Action> Worker::solve()
     return action_list;
 }
 
-class BeamSearcher
+double evaluate(const Worker& worker)
 {
-public:
-    void init(Worker& worker, int beam_width);
-
-    std::vector<Action> doit();
-
-private:
-    std::vector<Worker> worker_list;
-
-    int active_worker_size;
-
-    int max_turn;
-};
-
-void BeamSearcher::init(Worker& worker, int beam_width)
-{
-    worker_list.resize(beam_width);
-    // worker_list[0].copy_all_from(worker);
-    active_worker_size = 1;
-    max_turn = 100;
+    return 1.0;
 }
 
-std::vector<Action> BeamSearcher::doit()
+struct WorkerDiff
 {
-    std::vector<std::pair<double, int>> state_list;
+    int worker_id;
+    Action action;
+
+    WorkerDiff(int worker_id, Action action)
+        : worker_id(worker_id)
+        , action(action)
+    {
+    }
+};
+
+std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width)
+{
+    int prev = 0;
+    int next = 1;
+
+    static std::vector<Worker> worker_list[2];
+
+    static std::vector<std::pair<double, WorkerDiff>> state_list;
+
+    worker_list[prev].resize(beam_width);
+    worker_list[next].resize(beam_width);
+
+    int active_worker_size = 1;
+    state_list.clear();
+
+    Worker temp;
+
+    worker_list[prev][0].copy_from_complete(*init);
 
     std::vector<Action> action_list = {
         Action(ActionType::Move, Direction::Up),
@@ -1247,11 +1320,29 @@ std::vector<Action> BeamSearcher::doit()
         state_list.clear();
         for (int worker_id = 0; worker_id < active_worker_size; worker_id++)
         {
+            temp.copy_from_complete(worker_list[prev][worker_id]);
             for (auto& action : action_list)
             {
+                temp.apply(action);
+                // 小さいほどよい
+                double eval = evaluate(temp);
+                state_list.emplace_back(eval, WorkerDiff(worker_id, action));
+                temp.undo(action);
             }
+            // nearest move action
+        }
+        std::sort(state_list.begin(), state_list.end());
+        const int new_active_worker_size = std::min<int>(beam_width, state_list.size());
+        for (int i = 0; i < new_active_worker_size; i++)
+        {
+            WorkerDiff diff = state_list[i].second;
+
+            worker_list[next][i].copy_from(worker_list[prev][diff.worker_id]);
+            worker_list[next][i].apply(diff.action);
         }
     }
+
+    return init->get_action_list();
 }
 
 class Solver
