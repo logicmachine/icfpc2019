@@ -58,7 +58,7 @@ def process(info):
                 '{}/submit'.format(API_SERVER),
                 {
                     'problem_id': problem_id,
-                    'author': author + '+popt10',
+                    'author': author + '+popt9',
                     'solution': solution,
                     'boosters': boosters
                 })
