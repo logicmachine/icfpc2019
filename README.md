@@ -25,9 +25,9 @@ Compile and run it.
 * Parallelization system using Intel TBB modules.
 * Local search using the DFS for considering wrapping region.
 
-### logicmachine/disassembler
-* g++ -std=c++11 -Ofast main.cpp
-* disassemble all using GVoid(28, 29, 30)
+### logicmachine/patch-optimizer
+* g++ -std=c++17 -O3 main.cpp
+* Replace from short sequence to more shorter sequence.
 
 ### ashiba
 * Bot disassembles filled voxel from leaf of BFS-tree.
