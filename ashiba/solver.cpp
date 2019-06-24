@@ -189,7 +189,7 @@ bool useAllClone( Worker& robot ){
     return true;
 }
 
-
+/*
 bool useAllManipEx( Worker& robot ){
     int items_num = robot.countItem( B );
     int each_num = items_num/robot.robot_num;
@@ -210,7 +210,14 @@ bool useAllManipEx( Worker& robot ){
         for( int j=0; j<robot.robot_num; ++j ){
             if( alloced_items[j]>0 ){
                 alloced_items[j]--;
-                actions.push_back( Action( "B" ) );
+                set<pair<int,int>> manip
+                for( auto elm: manipulators_[j] ){
+                    manip.insert( elm );
+                }
+                pair<int,int> pos = make_pair( robot.y[j], robot.x[j] );
+
+
+                actions.push_back( Action( "B", pos, j ) );
             }else{
                 actions.push_back( Action( "Z" ) );
             }                
@@ -219,7 +226,7 @@ bool useAllManipEx( Worker& robot ){
     }
     return true;
 }
-
+*/
 /*
 bool useAllClone( Worker& robot ){
     if( not robot.hasItem( C ) ){
@@ -474,23 +481,47 @@ bool autoMultiMove( Worker& robot ){
 }
 
 
-int main(){
+string loadItemData( string filename ){
+    ifstream ifs( filename );
+    string ret;
+    ifs >> ret;
+    return ret;
+}
+
+int main(int argc, char* argv[]){
+    string l = "250";
+    string r = "251";
+    if( argc == 3 ){
+        l = argv[1];
+        r = argv[2];
+    }
+
     int start_y, start_x;
-    string dirname = "/Users/ashibata/GitHub/icfpc2019/problems/";
+    string dirname = "../problems/";
     
-    for( int i=300; i<=300; ++i ){
+    for( int i=stoi(l); i<stoi(r); ++i ){
         string filename = getFilename( i );
+
         
         vector<vector<Cell>> field = load_board( dirname + filename + ".desc", start_y, start_x );
         Worker robot( start_y, start_x, field );
-        
+
+        string items_data = loadItemData( dirname + filename + ".buy" );
+        for( auto ch: items_data ){
+            if( ch == 'B' )robot.items_[B]++;
+            if( ch == 'F' )robot.items_[F]++;
+            if( ch == 'L' )robot.items_[L]++;
+            if( ch == 'R' )robot.items_[R]++;
+            if( ch == 'C' )robot.items_[C]++;
+        }
+
         vector<vector<boardloader::Point>> labeled_points;
         getLabeledPoints( robot.field, labeled_points );
         
         // Find target Cell position
         set<Cell> target_cell;
         target_cell.insert( Cloning );
-        target_cell.insert( ManipulatorExtension );
+        //target_cell.insert( ManipulatorExtension );
 
         vector<pair<int,int>> items_pos;
         for( int i=0; i<robot.field.size(); ++i ){
