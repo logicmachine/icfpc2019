@@ -24,7 +24,7 @@ def get_submissions(problem_id):
             continue
         prefix = re.match(r'[a-zA-Z]+', s['author']).group(0)
         if prefix in submissions:
-            break
+            continue
         submissions[prefix] = {
             'problem_id': problem_id,
             'submission_id': s['id'],
