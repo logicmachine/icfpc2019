@@ -40,8 +40,6 @@ Compile and run it.
 * The order of deletion is based on the dfs search of the BFS tree.
 
 ### ikeda
-* calc dataset size ( x minimum index that we want to fill, y.. and maximum index )
-* divide 5 x 8 cells
-* send 40 bots on each section
-* each bots fill cells from bot to top on their section
-* if there is a section that ungrounded, my solver couldn’t solve
+* divide M in many squares.
+* easy to paint square
+* travel squares
