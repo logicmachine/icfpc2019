@@ -336,7 +336,7 @@ public:
     {
     }
 
-    std::string to_string()
+    std::string to_string() const
     {
         switch (type)
         {
@@ -360,9 +360,12 @@ public:
     }
 };
 
+void print_action(const std::vector<std::vector<xyzworker::Action>>& action_table, std::ostream& out);
+
 class Worker;
 
-std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, const std::vector<Point>& point_to_optimize);
+void beam_search(Worker* init, int max_turn, int beam_width, const std::vector<Point>& point_to_optimize,
+    std::vector<Action>& action_list);
 
 class Worker
 {
@@ -415,6 +418,8 @@ public:
 
     // Command
 
+    bool is_valid_move(const Action& action);
+
     void move(Direction dir);
 
     void unmove(Direction dir);
@@ -435,7 +440,11 @@ public:
 
     void setup_hash();
 
-    std::uint64_t hash();
+    std::uint64_t hash() const;
+
+    void print_table() const;
+
+    bool is_occupied(int cy, int cx) const;
 
 private:
     void wrap();
@@ -478,9 +487,50 @@ private:
     std::uint64_t _hash;
 };
 
-std::uint64_t Worker::hash()
+void Worker::print_table() const
+{
+    Table<Cell> table_for_print(height(), std::vector<Cell>(width()));
+    for (int i = 0; i < height(); i++)
+    {
+        for (int j = 0; j < width(); j++)
+        {
+            table_for_print[i][j] = table[i][j];
+            if (occupied[i][j] > 0)
+            {
+                table_for_print[i][j] = Cell::Occupied;
+            }
+        }
+    }
+    boardloader::print_table(table_for_print, y, x);
+}
+
+std::uint64_t Worker::hash() const
 {
     return _hash;
+}
+
+bool Worker::is_valid_move(const Action& action)
+{
+    switch (action.type)
+    {
+    case ActionType::Move:
+    {
+        const auto dp = to_point(action.direction);
+        const int ny = y + dp.y;
+        const int nx = x + dp.x;
+        return is_inside(ny, nx) && table[ny][nx] != Cell::Obstacle;
+    }
+
+    case ActionType::TurnClockwise:
+    case ActionType::TurnCounterClockwise:
+        return true;
+    }
+    assert(false);
+}
+
+bool Worker::is_occupied(int cy, int cx) const
+{
+    return occupied[cy][cx] > 0;
 }
 
 void Worker::apply(Action& action)
@@ -689,8 +739,6 @@ void Worker::copy_from_complete(const Worker& src)
         manipulator_list.push_back(p);
     }
 
-    // action list doesn't have to share
-
     item_counter.reset();
     item_counter += src.item_counter;
 
@@ -699,6 +747,8 @@ void Worker::copy_from_complete(const Worker& src)
     {
         action_list.push_back(action);
     }
+
+    _hash = src.hash();
 }
 
 void Worker::copy_from(const Worker& src)
@@ -738,6 +788,8 @@ void Worker::copy_from(const Worker& src)
     item_counter.reset();
 
     player_direction = Direction::Right;
+
+    setup_hash();
 }
 
 Worker::Worker(const Worker& src)
@@ -805,6 +857,7 @@ void Worker::move(Direction dir)
     int index = static_cast<int>(dir);
     y += ManhattanNeighbor::dy[index];
     x += ManhattanNeighbor::dx[index];
+
     action_list.emplace_back(ActionType::Move, dir);
 
     _hash ^= player_hash_table[y][x];
@@ -1242,18 +1295,28 @@ bool Worker::reset_to_small_region()
 
 std::vector<Point> Worker::select_optimize_region()
 {
-    auto empty_nearest = bfs_move_point([&](Point& p) { return is_empty(p.y, p.x); });
-
-    auto target_point_list = get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 40);
-
-    // if not empty
-    if (!target_point_list.empty())
+    const bool has_empty = bfs_move([&](Point& p) { return is_empty(p.y, p.x); }).size() > 0;
+    if (has_empty)
     {
-        bfs_move_with_move([&](Point& p) { return p == empty_nearest; });
-    }
 
-    // max size of beam search
-    return target_point_list;
+        auto empty_nearest = bfs_move_point([&](Point& p) { return is_empty(p.y, p.x); });
+
+        auto target_point_list = get_empty_connected_cell(empty_nearest.y, empty_nearest.x, 40);
+
+        // if not empty
+        if (!target_point_list.empty())
+        {
+            bfs_move_with_move([&](Point& p) { return p == empty_nearest; });
+        }
+
+        // max size of beam search
+        return target_point_list;
+    }
+    else
+    {
+        std::vector<Point> ret;
+        return ret;
+    }
 }
 
 void Worker::divide_and_search()
@@ -1270,7 +1333,8 @@ void Worker::divide_and_search()
             break;
         }
 
-        auto action_list = beam_search(this, 100, 3000, region_to_optimize);
+        std::vector<Action> action_list;
+        beam_search(this, 100, 3000, region_to_optimize, action_list);
 
         // apply
         for (auto& action : action_list)
@@ -1349,10 +1413,9 @@ std::vector<Action> Worker::solve()
 double evaluate(const Worker& worker, const std::vector<Point>& target_point)
 {
     int count = 0;
-    const auto& table = worker.get_table();
     for (auto& p : target_point)
     {
-        if (table[p.y][p.x])
+        if (worker.is_occupied(p.y, p.x))
         {
             count++;
         }
@@ -1374,12 +1437,19 @@ struct WorkerDiff
     }
 };
 
+std::ostream& operator<<(std::ostream& out, const WorkerDiff& diff)
+{
+    out << "(" << diff.worker_id << ": " << diff.action.to_string() << ")";
+    return out;
+}
+
 bool operator<(const WorkerDiff& d1, const WorkerDiff& d2)
 {
     return d1.rand < d2.rand;
 }
 
-std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, const std::vector<Point>& point_to_optimize)
+void beam_search(Worker* init, int max_turn, int beam_width, const std::vector<Point>& point_to_optimize,
+    std::vector<Action>& action_list)
 {
     std::mt19937_64 mt;
     int prev = 0;
@@ -1398,8 +1468,9 @@ std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, cons
     Worker temp;
 
     worker_list[prev][0].copy_from_complete(*init);
+    worker_list[prev][0].get_action_list().clear();
 
-    std::vector<Action> action_list = {
+    std::vector<Action> neighbor_move = {
         Action(ActionType::Move, Direction::Up),
         Action(ActionType::Move, Direction::Left),
         Action(ActionType::Move, Direction::Down),
@@ -1410,24 +1481,64 @@ std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, cons
 
     std::unordered_set<std::uint64_t> hash_set;
 
+    double best_eval = 0;
+    int min_turn = std::numeric_limits<int>::max();
+
     for (int turn = 0; turn < max_turn; turn++)
     {
         state_list.clear();
         for (int worker_id = 0; worker_id < active_worker_size; worker_id++)
         {
             temp.copy_from_complete(worker_list[prev][worker_id]);
-            for (auto& action : action_list)
+
+            for (auto& action : neighbor_move)
             {
-                temp.apply(action);
-                auto hash = temp.hash();
-                if (hash_set.find(hash) == hash_set.end())
+                if (temp.is_valid_move(action))
                 {
-                    // 小さいほどよい
-                    double eval = evaluate(temp, point_to_optimize);
-                    state_list.emplace_back(eval, WorkerDiff(worker_id, action, mt));
-                    hash_set.insert(hash);
+                    auto prev_hash = temp.hash();
+                    auto prev_action = temp.get_action_list().size();
+                    assert(prev_action == turn);
+
+                    temp.apply(action);
+                    auto hash = temp.hash();
+                    if (hash_set.find(hash) == hash_set.end())
+                    {
+                        // 大きいほどよい
+                        double eval = evaluate(temp, point_to_optimize);
+
+                        // 全部見つかった
+                        if (eval == point_to_optimize.size())
+                        {
+                            for (auto& v : temp.get_action_list())
+                            {
+                                action_list.push_back(v);
+                            }
+                            std::vector<std::vector<Action>> ret;
+                            ret.push_back(action_list);
+                            return;
+                        }
+
+                        // if (best_eval < eval || turn < min_turn)
+                        // {
+                        //     best_eval = eval;
+                        //     min_turn = turn;
+                        //     action_list.clear();
+                        //     for (auto& v : temp.get_action_list())
+                        //     {
+                        //         action_list.push_back(v);
+                        //     }
+                        // }
+
+                        state_list.emplace_back(-eval, WorkerDiff(worker_id, action, mt));
+                        hash_set.insert(hash);
+                    }
+                    temp.undo(action);
+
+                    auto rec_hash = temp.hash();
+                    auto rec_action = temp.get_action_list().size();
+                    assert(prev_action == rec_action);
+                    assert(prev_hash == rec_hash);
                 }
-                temp.undo(action);
             }
             // nearest move action
         }
@@ -1436,12 +1547,14 @@ std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, cons
         for (int i = 0; i < new_active_worker_size; i++)
         {
             WorkerDiff diff = state_list[i].second;
-            worker_list[next][i].copy_from(worker_list[prev][diff.worker_id]);
+            worker_list[next][i].copy_from_complete(worker_list[prev][diff.worker_id]);
             worker_list[next][i].apply(diff.action);
+            assert(worker_list[next][i].get_action_list().size() == turn + 1);
         }
+
+        active_worker_size = new_active_worker_size;
         std::swap(prev, next);
     }
-    return init->get_action_list();
 }
 
 class Solver
@@ -1588,11 +1701,7 @@ std::vector<std::vector<Action>> Solver::solve()
         target_list.push_back(p);
     }
 
-    if (target_list.size() == 0)
-    {
-        worker_list[0].dfs_with_restart();
-    }
-    else
+    if (target_list.size() > 0)
     {
         int nearest_index = worker_list[0].select_shortest(target_list);
         if (1 < target_list.size())
@@ -1624,14 +1733,14 @@ std::vector<std::vector<Action>> Solver::solve()
 
                 worker_list[i].bfs_move_with_move([&](Point& p) { return p == base_point_list[i]; });
                 fill_obstacle(clustering_result, worker_list[i].get_table(), i);
-                worker_list[i].dfs_with_restart();
+                worker_list[i].divide_and_search();
             }
 
             worker_list[0].bfs_move_with_move([&](Point& p) { return p == base_point_list[0]; });
             fill_obstacle(clustering_result, worker_list[0].get_table(), 0);
         }
-        worker_list[0].dfs_with_restart();
     }
+    worker_list[0].divide_and_search();
 
     std::vector<std::vector<Action>> ret;
     for (int i = 0; i < worker_size; i++)
@@ -1715,11 +1824,11 @@ int main(int argc, char* argv[])
     std::vector<std::vector<xyzworker::Action>> best_result;
     int best_score = std::numeric_limits<int>::max();
 
-    const int num_try = num_clone == 0 ? 1 : std::max<int>(5, (400 * 400 * 2) / (board.size() * board[0].size()));
+    const int num_try = 1; //num_clone == 0 ? 1 : std::max<int>(5, (400 * 400 * 2) / (board.size() * board[0].size()));
 
     for (int i = 1; i <= num_try; i++)
     {
-        double additional_rate = -0.5 + (static_cast<double>(i) / num_try);
+        double additional_rate = 0.2; // -0.5 + (static_cast<double>(i) / num_try);
         xyzworker::Solver solver(board, start_y, start_x, counter, additional_rate);
         auto result = solver.solve();
         const int score = solver.calculate_score();
