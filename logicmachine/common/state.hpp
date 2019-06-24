@@ -156,6 +156,19 @@ public:
 
 	const Boosters& boosters() const { return m_boosters; }
 
+	void initialize_boosters(std::istream& is){
+		int c;
+		while((c = is.get()) >= 0){
+			switch(c){
+			case 'B': ++m_boosters.manipulators; break;
+			case 'F': ++m_boosters.fast_wheels;  break;
+			case 'L': ++m_boosters.drills;       break;
+			case 'R': ++m_boosters.teleports;    break;
+			case 'C': ++m_boosters.clones;       break;
+			}
+		}
+	}
+
 	boost::optional<UndoBuffer> move_wrapper(int id, int dir){
 		const auto& d = NEIGHBORS[dir];
 		auto& w = m_wrappers[id];
