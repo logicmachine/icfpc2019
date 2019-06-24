@@ -10,7 +10,6 @@ const int manip_x[] = {1, 1, 1};
 class Worker{
     int H, W;
     vector<vector<pair<int,int>>> manipulators_;
-    vector<vector<Action>> action_log;
     vector<Direction> dir_;
     vector<int> speed_;
     
@@ -19,6 +18,7 @@ class Worker{
 public:
     int robot_num;
     vector<int> y, x;
+    vector<vector<Action>> action_log;
     vector<vector<Cell>> field;
     
     Worker( int yy, int xx, vector<vector<Cell>> &field ): field(field){
