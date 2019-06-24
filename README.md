@@ -30,9 +30,9 @@ Compile and run it.
 * Replace from short sequence to more shorter sequence.
 
 ### ashiba
-* Bot disassembles filled voxel from leaf of BFS-tree.
-* Bot fissions at most 40.
-* Each bot erases each own leaf.
+* g++ -std=c++11 -O2 main.cpp
+* ./a.out left right
+* ↑ Ecexute [left, right) testcase
 
 ### sayama
 * divide map by bfs and distribute to each cloned worker
