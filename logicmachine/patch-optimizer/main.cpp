@@ -11,7 +11,7 @@
 #include "../common/utility.hpp"
 
 
-static const int SOURCE_LENGTH = 10;
+static const int SOURCE_LENGTH = 9;
 static const int ITERATION_LIMIT = 5;
 
 inline int manhattan_distance(const Vec2& a, const Vec2& b){

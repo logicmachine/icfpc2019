@@ -144,6 +144,14 @@ struct Point
     int y;
     int x;
 
+
+    bool operator < (Point obj) const{
+        return std::pair<int,int>(y, x) < std::pair<int,int>(obj.y, obj.x);
+    }
+    bool operator == (Point obj) const{
+        return std::pair<int,int>(y, x) == std::pair<int,int>(obj.y, obj.x);
+    }
+
     static Point None()
     {
         return Point(-1, -1);
