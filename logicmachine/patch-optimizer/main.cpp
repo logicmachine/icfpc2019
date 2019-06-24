@@ -11,7 +11,7 @@
 #include "../common/utility.hpp"
 
 
-static const int SOURCE_LENGTH = 7;
+static const int SOURCE_LENGTH = 10;
 
 inline int manhattan_distance(const Vec2& a, const Vec2& b){
 	return abs(a.x - b.x) + abs(a.y - b.y);
@@ -27,6 +27,10 @@ bool optimize(
 	int cur_rotation,
 	State& state)
 {
+	const int min_distance =
+		  manhattan_distance(state.wrappers(wid).position, final_position)
+		+ std::min((cur_rotation - final_rotation) & 3, (final_rotation - cur_rotation) & 3);
+	if(depth < min_distance){ return false; }
 	if(depth == 0){
 		if((final_rotation & 3) != (cur_rotation & 3)){ return false; }
 		if(state.wrappers(wid).position != final_position){ return false; }
@@ -101,7 +105,6 @@ int main(int argc, char *argv[]){
 			int rotate = 0;
 			std::vector<State::UndoBuffer> ubs;
 			ubs.reserve(SOURCE_LENGTH);
-			const auto origin = state.wrappers(wid).position;
 			for(size_t i = head; i < tail; ++i){
 				const auto k = sequence[i].kind;
 				if(k != CommandKind::MOVE && k != CommandKind::ROTATE){ has_special = true; }
@@ -110,7 +113,6 @@ int main(int argc, char *argv[]){
 			}
 			const auto position = state.wrappers(wid).position;
 			rotate &= 3;
-			if(manhattan_distance(origin, position) == (tail - head)){ has_special = true; }
 			// Enumerate affected cells
 			std::unordered_map<Vec2, CellKind> affected;
 			for(const auto& ub : ubs){
@@ -124,7 +126,7 @@ int main(int argc, char *argv[]){
 				ubs.pop_back();
 			}
 			// ID-DFS
-			for(int depth = 0; !has_special && depth < (tail - head); ++depth){
+			for(int depth = 0; !has_special && depth + 1 < (tail - head); ++depth){
 				std::vector<Command> partial;
 				const auto ret = optimize(partial, depth, wid, position, rotate, affected, 0, state);
 				if(ret){
