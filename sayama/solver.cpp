@@ -6,6 +6,7 @@
 #include <random>
 #include <stack>
 #include <tuple>
+#include <unordered_set>
 
 using boardloader::Cell;
 using boardloader::ItemCounter;
@@ -16,6 +17,20 @@ using boardloader::Table;
 
 namespace xyzworker
 {
+
+std::array<std::array<std::uint64_t, 401>, 401> place_hash_table;
+std::array<std::array<std::uint64_t, 401>, 401> player_hash_table;
+
+void initialize_hash(std::array<std::array<std::uint64_t, 401>, 401>& hash_table, std::mt19937_64& mt)
+{
+    for (auto& row : hash_table)
+    {
+        for (auto& item : row)
+        {
+            item = mt();
+        }
+    }
+}
 
 class ManhattanNeighbor
 {
@@ -347,7 +362,7 @@ public:
 
 class Worker;
 
-std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width);
+std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, const std::vector<Point>& point_to_optimize);
 
 class Worker
 {
@@ -367,6 +382,7 @@ public:
     void undo(Action& action);
 
     Table<Cell>& get_table();
+    const Table<Cell>& get_table() const;
 
     std::vector<Action>& get_action_list();
 
@@ -417,6 +433,10 @@ public:
 
     ItemCounter item_counter;
 
+    void setup_hash();
+
+    std::uint64_t hash();
+
 private:
     void wrap();
     void unwrap();
@@ -454,7 +474,14 @@ private:
     std::vector<Point> manipulator_list;
 
     std::vector<Action> action_list;
+
+    std::uint64_t _hash;
 };
+
+std::uint64_t Worker::hash()
+{
+    return _hash;
+}
 
 void Worker::apply(Action& action)
 {
@@ -486,6 +513,23 @@ void Worker::undo(Action& action)
         unrotate_counterclockwise();
         break;
     }
+}
+
+void Worker::setup_hash()
+{
+    _hash = 0;
+    for (int i = 0; i < height(); i++)
+    {
+        for (int j = 0; j < width(); j++)
+        {
+            if (is_empty(i, j))
+            {
+                _hash ^= place_hash_table[i][j];
+            }
+        }
+    }
+    _hash ^= player_hash_table[y][x];
+    _hash += static_cast<std::uint64_t>(player_direction);
 }
 
 Worker::~Worker()
@@ -578,6 +622,11 @@ std::vector<Action>& Worker::get_action_list()
 }
 
 Table<Cell>& Worker::get_table()
+{
+    return table;
+}
+
+const Table<Cell>& Worker::get_table() const
 {
     return table;
 }
@@ -740,17 +789,25 @@ void Worker::unmove(Direction dir)
 
     action_list.pop_back();
 
+    _hash ^= player_hash_table[y][x];
+
     int index = static_cast<int>(dir);
     y -= ManhattanNeighbor::dy[index];
     x -= ManhattanNeighbor::dx[index];
+
+    _hash ^= player_hash_table[y][x];
 }
 
 void Worker::move(Direction dir)
 {
+    _hash ^= player_hash_table[y][x];
+
     int index = static_cast<int>(dir);
     y += ManhattanNeighbor::dy[index];
     x += ManhattanNeighbor::dx[index];
     action_list.emplace_back(ActionType::Move, dir);
+
+    _hash ^= player_hash_table[y][x];
 
     wrap();
 
@@ -793,6 +850,10 @@ void Worker::wrap()
             else if (table[ny][nx] != Cell::Obstacle)
             {
                 occupied[ny][nx]++;
+                if (occupied[ny][nx] == 1)
+                {
+                    _hash ^= place_hash_table[ny][nx];
+                }
             }
         }
     }
@@ -816,6 +877,10 @@ void Worker::unwrap()
             else if (table[ny][nx] != Cell::Obstacle)
             {
                 occupied[ny][nx]--;
+                if (occupied[ny][nx] == 0)
+                {
+                    _hash ^= place_hash_table[ny][nx];
+                }
             }
         }
     }
@@ -823,7 +888,9 @@ void Worker::unwrap()
 
 void Worker::unrotate_clockwise()
 {
+    _hash -= static_cast<std::uint64_t>(player_direction);
     player_direction = counter_clockwise(player_direction);
+    _hash += static_cast<std::uint64_t>(player_direction);
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -836,7 +903,10 @@ void Worker::unrotate_clockwise()
 
 void Worker::unrotate_counterclockwise()
 {
+    _hash -= static_cast<std::uint64_t>(player_direction);
     player_direction = clockwise(player_direction);
+    _hash += static_cast<std::uint64_t>(player_direction);
+
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -849,7 +919,10 @@ void Worker::unrotate_counterclockwise()
 
 void Worker::rotate_clockwise()
 {
+    _hash -= static_cast<std::uint64_t>(player_direction);
     player_direction = clockwise(player_direction);
+    _hash += static_cast<std::uint64_t>(player_direction);
+
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -862,7 +935,10 @@ void Worker::rotate_clockwise()
 
 void Worker::rotate_counterclockwise()
 {
+    _hash -= static_cast<std::uint64_t>(player_direction);
     player_direction = counter_clockwise(player_direction);
+    _hash += static_cast<std::uint64_t>(player_direction);
+
     for (auto& p : manipulator_list)
     {
         const int py = p.y;
@@ -1194,7 +1270,7 @@ void Worker::divide_and_search()
             break;
         }
 
-        auto action_list = beam_search(this, 100, 3000);
+        auto action_list = beam_search(this, 100, 3000, region_to_optimize);
 
         // apply
         for (auto& action : action_list)
@@ -1270,25 +1346,42 @@ std::vector<Action> Worker::solve()
     return action_list;
 }
 
-double evaluate(const Worker& worker)
+double evaluate(const Worker& worker, const std::vector<Point>& target_point)
 {
-    return 1.0;
+    int count = 0;
+    const auto& table = worker.get_table();
+    for (auto& p : target_point)
+    {
+        if (table[p.y][p.x])
+        {
+            count++;
+        }
+    }
+    return count;
 }
 
 struct WorkerDiff
 {
     int worker_id;
     Action action;
+    std::uint64_t rand;
 
-    WorkerDiff(int worker_id, Action action)
+    WorkerDiff(int worker_id, Action action, std::mt19937_64& mt)
         : worker_id(worker_id)
         , action(action)
+        , rand(mt())
     {
     }
 };
 
-std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width)
+bool operator<(const WorkerDiff& d1, const WorkerDiff& d2)
 {
+    return d1.rand < d2.rand;
+}
+
+std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width, const std::vector<Point>& point_to_optimize)
+{
+    std::mt19937_64 mt;
     int prev = 0;
     int next = 1;
 
@@ -1315,6 +1408,8 @@ std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width)
         Action(ActionType::TurnCounterClockwise)
     };
 
+    std::unordered_set<std::uint64_t> hash_set;
+
     for (int turn = 0; turn < max_turn; turn++)
     {
         state_list.clear();
@@ -1324,9 +1419,14 @@ std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width)
             for (auto& action : action_list)
             {
                 temp.apply(action);
-                // 小さいほどよい
-                double eval = evaluate(temp);
-                state_list.emplace_back(eval, WorkerDiff(worker_id, action));
+                auto hash = temp.hash();
+                if (hash_set.find(hash) == hash_set.end())
+                {
+                    // 小さいほどよい
+                    double eval = evaluate(temp, point_to_optimize);
+                    state_list.emplace_back(eval, WorkerDiff(worker_id, action, mt));
+                    hash_set.insert(hash);
+                }
                 temp.undo(action);
             }
             // nearest move action
@@ -1336,12 +1436,11 @@ std::vector<Action> beam_search(Worker* init, int max_turn, int beam_width)
         for (int i = 0; i < new_active_worker_size; i++)
         {
             WorkerDiff diff = state_list[i].second;
-
             worker_list[next][i].copy_from(worker_list[prev][diff.worker_id]);
             worker_list[next][i].apply(diff.action);
         }
+        std::swap(prev, next);
     }
-
     return init->get_action_list();
 }
 
@@ -1543,8 +1642,6 @@ std::vector<std::vector<Action>> Solver::solve()
     return ret;
 }
 
-} // namespace xyzworker
-
 void print_action(const std::vector<std::vector<xyzworker::Action>>& action_table, std::ostream& out)
 {
     bool first = true;
@@ -1578,9 +1675,16 @@ void save_action(const std::vector<std::vector<xyzworker::Action>>& action_table
 
     fout.close();
 }
+} // namespace xyzworker
+
+using namespace xyzworker;
 
 int main(int argc, char* argv[])
 {
+    std::mt19937_64 mt;
+    initialize_hash(xyzworker::place_hash_table, mt);
+    initialize_hash(player_hash_table, mt);
+
     std::string input_filepath(argv[1]);
 
     int start_y, start_x;
