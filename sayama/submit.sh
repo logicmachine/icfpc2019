@@ -9,7 +9,7 @@ prob_to=$3
 for i in `seq $prob_from $mod $prob_to`;
 do
     format_i=`printf %03d $i`
-    filepath=${input_folder}/prob-${format_i}.desc
+    filepath=${folder}/prob-${format_i}.sol
     text=`cat $filepath`
     boosterpath=${input_folder}/prob-${format_i}.buy
     booster=`cat $boosterpath`

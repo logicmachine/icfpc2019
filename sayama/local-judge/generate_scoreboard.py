@@ -9,6 +9,7 @@ basedir_template = "answer/submit{}"
 
 # 出力ファイルフォーマット。 {:03} の部分に、 0埋めの整数が入ると思えばOK
 scorefile_template = "prob-{:03}.desc"
+scorefile_template2 = "prob-{:03}.sol"
 
 # スコアボードを算出する問題が、1 〜 いくつまでか
 problem_to = 300
@@ -31,7 +32,14 @@ def score_list(dir_path):
     for seed in range(1, problem_to + 1):
         scorepath_template = "{}{}" + scorefile_template
         scorefile = scorepath_template.format(dir_path, os.sep, seed)
-        scores.append(get_score(scorefile))
+        score = get_score(scorefile)
+        if score == '-':
+            scorepath_template2 = "{}{}" + scorefile_template2
+            scorefile = scorepath_template2.format(dir_path, os.sep, seed)
+            score2 = get_score(scorefile)
+            scores.append(score2)
+        else:
+            scores.append(score)
     return scores
 
 
