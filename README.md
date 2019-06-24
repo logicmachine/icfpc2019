@@ -35,9 +35,9 @@ Compile and run it.
 * Each bot erases each own leaf.
 
 ### sayama
-* create BFS tree and restrict nanobot’s motion as follows.
-* The smaller the depth of BFS tree is, the earlier voxels are removed.
-* The order of deletion is based on the dfs search of the BFS tree.
+* divide map by bfs and distribute to each cloned worker
+* small empty cluster has high priority to travel
+* if there is no neighbor empty cell, move to nearest empty cell by bfs.
 
 ### ikeda
 * divide M in many squares.
