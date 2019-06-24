@@ -825,7 +825,8 @@ void Worker::dfs_with_restart()
         boardloader::Point p(y, x);
         for (int i = 0; i < used.size(); i++) {
             if (!used[i]) {
-                int tmp = ikeda::calc_distance(table, p, blocks[i].small);
+                int tmp = ikeda::calc_distance(table, p, blocks[i].small)
+                    + ikeda::calc_distance(table, p, blocks[i].large);
                 if (score > tmp) {
                     score = tmp;
                     targ = i;
