@@ -601,13 +601,13 @@ void Worker::wrap()
 
         if (is_inside(ny, nx))
         {
-            if (i >= 3 && table[ny][nx] == Cell::Obstacle)
+            if (i >= 3 && this->table[ny][nx] == Cell::Obstacle)
             {
                 break;
             }
-            else if (table[ny][nx] != Cell::Obstacle)
+            else if (this->table[ny][nx] != Cell::Obstacle)
             {
-                table[ny][nx] = Cell::Occupied;
+                this->table[ny][nx] = Cell::Occupied;
             }
         }
     }
@@ -806,11 +806,11 @@ bool Worker::filled(int ly, int lx, int hy, int hx)
         for (int j = lx; j <= hx; j++) {
             if (table[i][j] != Cell::Occupied &&
                     table[i][j] != Cell::Obstacle) {
-                return true;
+                return false;
             }
         }
     }
-    return false;
+    return true;
 }
 
 void Worker::dfs_with_restart()
@@ -825,7 +825,8 @@ void Worker::dfs_with_restart()
         boardloader::Point p(y, x);
         for (int i = 0; i < used.size(); i++) {
             if (!used[i]) {
-                int tmp = ikeda::calc_distance(table, p, blocks[i].small);
+                int tmp = ikeda::calc_distance(table, p, blocks[i].small)
+                    + ikeda::calc_distance(table, p, blocks[i].large);
                 if (score > tmp) {
                     score = tmp;
                     targ = i;
@@ -851,61 +852,32 @@ void Worker::dfs_with_restart()
                 }
                 move(dir);
             }
-            int pldir = direction_to_int(player_direction);
-            cmd = ikeda::paint(table, blocks[targ], p, pldir);
-            for (int j = 0; j < cmd.size(); j++) {
-                wrap();
-                if (cmd[j] == 'W') {
-                    move(Direction::Up);
-                } else if (cmd[j] == 'A') {
-                    move(Direction::Left);
-                } else if (cmd[j] == 'S') {
-                    move(Direction::Down);
-                } else if (cmd[j] == 'D') {
-                    move(Direction::Right);
-                } else if (cmd[j] == 'Q') {
-                    rotate_counterclockwise();
-                } else if (cmd[j] == 'E') {
-                    rotate_clockwise();
+            if (!filled(blocks[targ].small.y, blocks[targ].small.x, 
+                        blocks[targ].large.y, blocks[targ].large.x)) {
+                int pldir = direction_to_int(player_direction);
+                cmd = ikeda::paint(table, blocks[targ], p, pldir);
+                for (int j = 0; j < cmd.size(); j++) {
+                    wrap();
+                    if (cmd[j] == 'W') {
+                        move(Direction::Up);
+                    } else if (cmd[j] == 'A') {
+                        move(Direction::Left);
+                    } else if (cmd[j] == 'S') {
+                        move(Direction::Down);
+                    } else if (cmd[j] == 'D') {
+                        move(Direction::Right);
+                    } else if (cmd[j] == 'Q') {
+                        rotate_counterclockwise();
+                    } else if (cmd[j] == 'E') {
+                        rotate_clockwise();
+                    }
                 }
             }
         }
     }
-
-    /*
-    while (true)
-    {
-        wrap();
-
-        if (!reset_to_small_region())
-        {
-            selected.clear();
-
-            for (int i = 0; i < 4; i++)
-            {
-                const int ny = y + dy[i];
-                const int nx = x + dx[i];
-                if (is_inside(ny, nx) && is_empty(ny, nx))
-                {
-                    const Direction dir = static_cast<Direction>(i);
-                    selected.emplace_back(get_empty_neighrbor_cell(ny, nx), dir);
-                }
-            }
-            if (selected.empty())
-            {
-                if (!bfs_move([&](Point& p) { return is_empty(p.y, p.x); }))
-                {
-                    break;
-                }
-            }
-            else
-            {
-                sort(selected.begin(), selected.end());
-                move(selected[0].second);
-            }
-        }
-    }
-    */
+    //cout << "fin : " << endl;
+    //print_table(this->table, 0, 0);
+    //cout << endl;
 }
 
 void Worker::dfs(int cy, int cx)
@@ -1137,4 +1109,5 @@ int main(int argc, char* argv[])
     auto result = solver.solve();
 
     print_action(result, std::cout);
+
 }
