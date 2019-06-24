@@ -283,7 +283,7 @@ enum class ActionType
     Teleport,
 };
 
-class Action
+struct Action
 {
     ActionType type;
     Point relative_position;
@@ -1058,10 +1058,61 @@ std::vector<Action> Worker::solve()
     return action_list;
 }
 
+/**
+class BeamSearcher
+{
+public:
+    void init(Worker& worker, int beam_width);
+
+    std::vector<Action> doit();
+
+private:
+    std::vector<Worker> worker_list;
+
+    int active_worker_size;
+
+    int max_turn;
+};
+
+void BeamSearcher::init(Worker& worker, int beam_width)
+{
+    worker_list.resize(beam_width);
+    worker_list[0].copy_all_from(worker);
+    active_worker_size = 1;
+    max_turn = 100;
+}
+
+std::vector<Action> BeamSearcher::doit()
+{
+    std::vector<std::pair<double, WorkerStateDiff>> state_list;
+
+    std::vector<Action> action_list = {
+        Action(ActionType::Move, Direction::Up),
+        Action(ActionType::Move, Direction::Left),
+        Action(ActionType::Move, Direction::Down),
+        Action(ActionType::Move, Direction::Right),
+        Action(ActionType::TurnClockwise),
+        Action(ActionType::TurnCounterClockwise)
+    };
+
+    for (int turn = 0; turn < max_turn; turn++)
+    {
+        state_list.clear();
+        for (int worker_id = 0; worker_id < active_worker_size; worker_id++)
+        {
+            for (auto& action : action_list)
+            {
+
+            }
+        }
+    }
+}
+**/
+
 class Solver
 {
 public:
-    Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& counter);
+    Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& counter, const double additional_work_rate);
 
     std::vector<std::vector<Action>> solve();
 
@@ -1069,10 +1120,32 @@ public:
 
     std::vector<Point> generate_base_point_list(Worker& worker, int number_cluster);
 
+    int calculate_score();
+
 private:
     std::vector<Worker> worker_list;
     Cluster cluster;
+    int worker_size;
+    double additional_0;
 };
+
+int Solver::calculate_score()
+{
+    auto& action_list = worker_list[0].get_action_list();
+    int index = 1;
+    int ret = action_list.size();
+    for (int i = 0; i < action_list.size(); i++)
+    {
+        if (action_list[i].type == ActionType::Cloning)
+        {
+            const int start_time = i + 1;
+            const int score = start_time + worker_list[index].get_action_list().size();
+            ret = std::max<int>(ret, score);
+            index++;
+        }
+    }
+    return ret;
+}
 
 std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_count)
 {
@@ -1101,7 +1174,7 @@ std::vector<Point> Solver::generate_base_point_list(Worker& worker, int cluster_
 
     std::vector<int> target_list(cluster_count, 0);
     const int empty_count = worker_list[0].gather(Cell::Empty).size();
-    constexpr double additional_0 = 0.2;
+
     target_list[0] = static_cast<int>(empty_count * (1.0 + additional_0) / (cluster_count + additional_0));
     for (int i = 1; i < cluster_count; i++)
     {
@@ -1146,10 +1219,12 @@ void Solver::fill_obstacle(const Table<int>& cluster, Table<Cell>& table, int id
     }
 }
 
-Solver::Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& item_counter)
+Solver::Solver(Table<Cell> table, int start_y, int start_x, ItemCounter& item_counter, double additional_work_rate)
 {
     worker_list.resize(1000);
     worker_list[0].init(table, start_y, start_x, item_counter);
+    worker_size = 1;
+    this->additional_0 = additional_work_rate;
 }
 
 std::vector<std::vector<Action>> Solver::solve()
@@ -1177,8 +1252,6 @@ std::vector<std::vector<Action>> Solver::solve()
     {
         target_list.push_back(p);
     }
-
-    int worker_size = 1;
 
     if (target_list.size() == 0)
     {
@@ -1287,8 +1360,35 @@ int main(int argc, char* argv[])
         counter += item_list;
     }
 
-    xyzworker::Solver solver(board, start_y, start_x, counter);
-    auto result = solver.solve();
+    int num_clone = counter.get(boardloader::Cell::Cloning);
+    for (auto& row : board)
+    {
+        for (auto& cell : row)
+        {
+            if (cell == Cell::Cloning)
+            {
+                num_clone++;
+            }
+        }
+    }
 
-    print_action(result, std::cout);
+    std::vector<std::vector<xyzworker::Action>> best_result;
+    int best_score = std::numeric_limits<int>::max();
+
+    const int num_try = num_clone == 0 ? 1 : std::max<int>(5, (400 * 400 * 2) / (board.size() * board[0].size()));
+
+    for (int i = 1; i <= num_try; i++)
+    {
+        double additional_rate = -0.5 + (static_cast<double>(i) / num_try);
+        xyzworker::Solver solver(board, start_y, start_x, counter, additional_rate);
+        auto result = solver.solve();
+        const int score = solver.calculate_score();
+        if (score < best_score)
+        {
+            best_score = score;
+            best_result = result;
+        }
+    }
+
+    print_action(best_result, std::cout);
 }
