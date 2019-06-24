@@ -15,7 +15,7 @@ driver.get('https://icfpcontest2019.github.io/solution_visualiser/')
 # visualizer DOM?
 element = driver.find_element_by_id('submit_task') 
 
-input_data_path = './desc'
+input_data_path = './ss'
 files = []
 for filename in os.listdir(input_data_path):
     print(filename)
