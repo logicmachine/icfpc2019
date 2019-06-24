@@ -11,7 +11,7 @@
 #include "../common/utility.hpp"
 
 
-static const int SOURCE_LENGTH = 9;
+static const int SOURCE_LENGTH = 10;
 
 inline int manhattan_distance(const Vec2& a, const Vec2& b){
 	return abs(a.x - b.x) + abs(a.y - b.y);
@@ -126,7 +126,7 @@ int main(int argc, char *argv[]){
 				ubs.pop_back();
 			}
 			// ID-DFS
-			for(int depth = 0; !has_special && depth < (tail - head); ++depth){
+			for(int depth = 0; !has_special && depth + 1 < (tail - head); ++depth){
 				std::vector<Command> partial;
 				const auto ret = optimize(partial, depth, wid, position, rotate, affected, 0, state);
 				if(ret){
