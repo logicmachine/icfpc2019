@@ -336,7 +336,7 @@ public:
     {
     }
 
-    std::string to_string() const
+    std::string to_string()
     {
         switch (type)
         {
@@ -1497,7 +1497,7 @@ struct WorkerDiff
     }
 };
 
-std::ostream& operator<<(std::ostream& out, const WorkerDiff& diff)
+std::ostream& operator<<(std::ostream& out, WorkerDiff& diff)
 {
     out << "(" << diff.worker_id << ": " << diff.action.to_string() << ")";
     return out;
